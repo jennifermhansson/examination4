@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "start": "bun ./src/server.ts",
-    "dev": "bun ./src/server.ts"
+    "dev": "bun ./src/server.ts",
+    "seed": "bun run src/db/seed.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -14,7 +15,8 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/jwt": "^10.1.0",
     "fastify": "^5.8.5"
   }
 }
-  
