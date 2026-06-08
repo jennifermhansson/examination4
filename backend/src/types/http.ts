@@ -6,7 +6,7 @@ export type RegisterRequest = {
   password: string;
 };
 
-// Vad en inloggad användare får ha tillgång till
+// Vad en inloggad kund får ha tillgång till
 export type Customer = {
   id: number;
   username: string;
@@ -16,12 +16,6 @@ export type Customer = {
   created_at: Date;
   updated_at: Date | null;
 };
-
-// DatabaseUser, som är den kompletta användaren som bara finns i databasen eller som admins kan se.
-
-// AuthenticatedUser så som användaren själv ska få när den är inloggad
-
-// PublicUser, vad andra användare kan se om användaren
 
 export type LoginRequest = {
   username: string;

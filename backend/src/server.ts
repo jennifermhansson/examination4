@@ -22,8 +22,6 @@ const host = "0.0.0.0";
 
 registerErrorHandler(httpServer);
 
-// Vi har nu tillsatt en error handler
-
 async function start() {
   await httpServer.register(fastifyCors, { origin: true });
 
