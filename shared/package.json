@@ -1,0 +1,11 @@
+{
+  "name": "@exam4/shared",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "amqplib": "^0.10.5"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.7"
+  }
+}

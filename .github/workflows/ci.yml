@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install shared dependencies
+        run: bun install
+        working-directory: shared
+
+      - name: Run unit tests
+        run: bun test tests/unit
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start stack
+        run: docker compose up -d --build
+
+      - name: Wait for nginx
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://localhost/api/health; then
+              echo "System is up"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Stack failed to start"
+          docker compose logs
+          exit 1
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Run e2e tests
+        run: bun test tests/e2e
+        env:
+          E2E_BASE_URL: http://localhost
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

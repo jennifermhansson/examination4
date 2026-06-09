@@ -1,0 +1,9 @@
+{
+  "name": "examination4",
+  "private": true,
+  "scripts": {
+    "test:unit": "bun test tests/unit",
+    "test:e2e": "bun test tests/e2e",
+    "test": "bun test tests/unit && bun test tests/e2e"
+  }
+}

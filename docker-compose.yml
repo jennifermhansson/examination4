@@ -1,0 +1,133 @@
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - product-service
+      - order-service
+      - kitchen-service
+      - notification-service
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: exam4
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d exam4"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  seed:
+    image: oven/bun:1
+    working_dir: /app
+    volumes:
+      - ./db:/app
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+    command: sh -c "bun add bcryptjs && bun run migrate.ts && bun run 02-seed.ts"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  product-service:
+    build:
+      context: .
+      dockerfile: services/product-service/Dockerfile
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      PRODUCT_SERVICE_URL: http://product-service:3002
+      JWT_SECRET_KEY: exam4-dev-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  kitchen-service:
+    build:
+      context: .
+      dockerfile: services/kitchen-service/Dockerfile
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      JWT_SECRET_KEY: exam4-dev-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    environment:
+      PORT: 3005
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      JWT_SECRET_KEY: exam4-dev-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
