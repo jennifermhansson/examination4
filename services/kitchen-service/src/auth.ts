@@ -5,7 +5,7 @@ import fp from "fastify-plugin";
 export type TokenPayload = {
   id: string;
   email: string;
-  role: "customer" | "kitchen" | "admin";
+  role: "customer" | "kitchen";
 };
 
 const secretKey = process.env.JWT_SECRET_KEY || "dev-secret-key";

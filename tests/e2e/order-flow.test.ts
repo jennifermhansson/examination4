@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 
 const BASE_URL = process.env.E2E_BASE_URL || "http://localhost";
 
@@ -31,41 +31,10 @@ describe("order flow e2e", () => {
     expect(health.ok).toBe(true);
   });
 
-  test("register customer", async () => {
-    const unique = Date.now();
-    const { response, body } = await api("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({
-        username: `user${unique}`,
-        email: `user${unique}@test.se`,
-        phone: "+46701234567",
-        birthdate: "1995-05-15",
-        password: "password123",
-      }),
-    });
-
-    expect(response.status).toBe(201);
-    expect(body.id).toBeDefined();
-  });
-
   test("login customer", async () => {
-    const unique = Date.now();
-    const email = `e2e${unique}@test.se`;
-
-    await api("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({
-        username: `e2e${unique}`,
-        email,
-        phone: "+46701234568",
-        birthdate: "1995-05-15",
-        password: "password123",
-      }),
-    });
-
     const { response, body } = await api("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password: "password123" }),
+      body: JSON.stringify({ email: "customer@test.se", password: "customer123" }),
     });
 
     expect(response.status).toBe(200);
@@ -85,6 +54,24 @@ describe("order flow e2e", () => {
     expect(response.status).toBe(200);
     expect(body.token).toBeDefined();
     kitchenToken = body.token;
+  });
+
+  test("login fails with wrong password", async () => {
+    const { response } = await api("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: "customer@test.se", password: "wrongpassword" }),
+    });
+    expect(response.status).toBe(401);
+  });
+
+  test("protected endpoint requires token", async () => {
+    const { response } = await api("/api/orders");
+    expect(response.status).toBe(401);
+  });
+
+  test("customer cannot access kitchen endpoint", async () => {
+    const { response } = await api("/api/kitchen/orders", {}, customerToken);
+    expect(response.status).toBe(403);
   });
 
   test("list products", async () => {

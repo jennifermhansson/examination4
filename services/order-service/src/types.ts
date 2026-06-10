@@ -1,7 +1,7 @@
 export type TokenPayload = {
   id: string;
   email: string;
-  role: "customer" | "kitchen" | "admin";
+  role: "customer" | "kitchen";
 };
 
 export type CreateOrderItem = {

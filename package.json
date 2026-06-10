@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
     "test:e2e": "bun test tests/e2e",
-    "test": "bun test tests/unit && bun test tests/e2e"
+    "test": "bun test tests/unit && bun test tests/integration && bun test tests/e2e"
   }
 }

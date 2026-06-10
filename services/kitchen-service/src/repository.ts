@@ -1,5 +1,5 @@
+import type { OrderItemEvent } from "../../../shared/src/events";
 import { db } from "./db";
-import type { OrderItemEvent } from "@exam4/shared/src/events";
 
 export type KitchenOrderRow = {
   id: string;
@@ -52,11 +52,11 @@ export async function getActiveOrders(): Promise<KitchenOrderRow[]> {
   const rows = await db`
     SELECT id, customer_id, status, total_price, items, created_at, updated_at
     FROM kitchen_orders
-    WHERE status NOT IN ('ready', 'completed')
+    WHERE status != 'completed'
     ORDER BY created_at ASC
   `;
 
-  return rows.map((row) => ({ ...row, items: parseItems(row.items) }));
+  return rows.map((row: KitchenOrderRow) => ({ ...row, items: parseItems(row.items) }));
 }
 
 export async function updateKitchenOrderStatus(

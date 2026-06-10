@@ -11,11 +11,13 @@ interface Props {
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   pending: 'preparing',
   preparing: 'ready',
+  ready: 'completed',
 }
 
 const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
   pending: 'Start tillagning',
   preparing: 'Markera klar',
+  ready: 'Markera levererad',
 }
 
 export default function KitchenView({ kitchenToken }: Props) {

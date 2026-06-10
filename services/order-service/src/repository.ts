@@ -17,26 +17,6 @@ export type OrderRow = {
   created_at: string;
 };
 
-export async function createCustomer(data: {
-  username: string;
-  email: string;
-  phone: string;
-  birthdate: string;
-  passwordHash: string;
-}) {
-  const [customer] = await db`
-    INSERT INTO customers (username, email, phone, birthdate, password_hash)
-    VALUES (
-      ${data.username},
-      ${data.email},
-      ${data.phone},
-      ${data.birthdate},
-      ${data.passwordHash}
-    )
-    RETURNING id, username, email, role
-  `;
-  return customer;
-}
 
 export async function findCustomerByEmail(
   email: string,
@@ -47,6 +27,20 @@ export async function findCustomerByEmail(
     WHERE email = ${email}
   `;
   return customer ?? null;
+}
+
+export async function createCustomer(
+  username: string,
+  email: string,
+  passwordHash: string,
+): Promise<CustomerRow> {
+  const [customer] = await db<CustomerRow[]>`
+    INSERT INTO customers (username, email, password_hash)
+    VALUES (${username}, ${email}, ${passwordHash})
+    RETURNING id, username, email, role, password_hash
+  `;
+  if (!customer) throw new Error("Failed to create customer");
+  return customer;
 }
 
 export async function createOrderWithItems(

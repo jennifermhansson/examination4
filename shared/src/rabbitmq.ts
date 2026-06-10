@@ -2,7 +2,7 @@ import amqp from "amqplib";
 import { EXCHANGE } from "./events";
 
 export type RabbitConnection = {
-  connection: amqp.Connection;
+  connection: amqp.ChannelModel;
   channel: amqp.Channel;
 };
 

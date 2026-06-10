@@ -1,23 +1,24 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { TokenPayload } from "./auth";
+import { Unauthorized, Forbidden } from "../../../shared/src/errors";
 
 export async function authenticate(
   request: FastifyRequest,
-  reply: FastifyReply,
+  _reply: FastifyReply,
 ) {
   try {
     const user = await request.jwtVerify<TokenPayload>();
     request.user = user;
   } catch {
-    return reply.code(401).send({ message: "Unauthorized" });
+    throw new Unauthorized();
   }
 }
 
 export async function requireKitchen(
   request: FastifyRequest,
-  reply: FastifyReply,
+  _reply: FastifyReply,
 ) {
-  if (request.user.role !== "kitchen" && request.user.role !== "admin") {
-    return reply.code(403).send({ message: "Kitchen access required" });
+  if (request.user.role !== "kitchen") {
+    throw new Forbidden("Kitchen access required");
   }
 }

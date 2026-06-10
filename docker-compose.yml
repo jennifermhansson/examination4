@@ -27,14 +27,14 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: exam4
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d exam4"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -45,7 +45,7 @@ services:
     volumes:
       - ./db:/app
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     command: sh -c "bun add bcryptjs && bun run migrate.ts && bun run 02-seed.ts"
     depends_on:
       postgres:
@@ -58,7 +58,7 @@ services:
       dockerfile: services/product-service/Dockerfile
     environment:
       PORT: 3002
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,10 +72,10 @@ services:
       dockerfile: services/order-service/Dockerfile
     environment:
       PORT: 3003
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       RABBITMQ_URL: amqp://rabbitmq:5672
       PRODUCT_SERVICE_URL: http://product-service:3002
-      JWT_SECRET_KEY: exam4-dev-secret
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,9 +93,9 @@ services:
       dockerfile: services/kitchen-service/Dockerfile
     environment:
       PORT: 3004
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       RABBITMQ_URL: amqp://rabbitmq:5672
-      JWT_SECRET_KEY: exam4-dev-secret
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,9 +111,9 @@ services:
       dockerfile: services/notification-service/Dockerfile
     environment:
       PORT: 3005
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/exam4
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       RABBITMQ_URL: amqp://rabbitmq:5672
-      JWT_SECRET_KEY: exam4-dev-secret
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy

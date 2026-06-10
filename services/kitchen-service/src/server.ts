@@ -10,13 +10,19 @@ import auth from "./auth";
 import { authenticate, requireKitchen } from "./middleware";
 import { isValidStatusTransition } from "./kitchen-logic";
 import * as repository from "./repository";
+import { registerErrorHandler } from "../../../shared/src/error-handler";
+import { BadRequest, NotFound, ValidationError } from "../../../shared/src/errors";
 
 const app = fastify({ logger: true });
 const port = Number(process.env.PORT) || 3004;
 const rabbitUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq:5672";
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 await app.register(fastifyCors, { origin: true });
 await app.register(auth);
+registerErrorHandler(app);
 
 const { channel } = await connectRabbit(rabbitUrl);
 
@@ -54,26 +60,28 @@ app.patch(
     const { id } = request.params as { id: string };
     const { status } = request.body as { status: string };
 
+    if (!UUID_REGEX.test(id)) {
+      throw new BadRequest("Invalid order id");
+    }
+
     const allowed = ["preparing", "ready", "completed"];
     if (!allowed.includes(status)) {
-      return reply.code(400).send({ message: "Invalid status" });
+      throw new ValidationError("Invalid status");
     }
 
     const current = await repository.getKitchenOrderById(id);
 
     if (!current) {
-      return reply.code(404).send({ message: "Order not found" });
+      throw new NotFound("Order not found");
     }
 
     if (!isValidStatusTransition(current.status, status)) {
-      return reply.code(400).send({
-        message: `Cannot transition from ${current.status} to ${status}`,
-      });
+      throw new BadRequest(`Cannot transition from ${current.status} to ${status}`);
     }
 
     const updated = await repository.updateKitchenOrderStatus(id, status);
     if (!updated) {
-      return reply.code(404).send({ message: "Order not found" });
+      throw new NotFound("Order not found");
     }
 
     const event: OrderStatusUpdatedEvent = {

@@ -3,13 +3,10 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   username TEXT NOT NULL UNIQUE,
-  role TEXT NOT NULL DEFAULT 'customer',
   email TEXT NOT NULL UNIQUE,
-  phone TEXT NOT NULL,
-  birthdate DATE NOT NULL,
   password_hash TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  role TEXT NOT NULL DEFAULT 'customer',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS products (

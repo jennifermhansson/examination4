@@ -10,6 +10,7 @@ import auth from "./auth";
 import { authenticate, requireCustomer } from "./middleware";
 import { messageForStatus } from "./notification-logic";
 import * as repository from "./repository";
+import { registerErrorHandler } from "../../../shared/src/error-handler";
 
 const app = fastify({ logger: true });
 const port = Number(process.env.PORT) || 3005;
@@ -17,6 +18,7 @@ const rabbitUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq:5672";
 
 await app.register(fastifyCors, { origin: true });
 await app.register(auth);
+registerErrorHandler(app);
 
 const { channel } = await connectRabbit(rabbitUrl);
 
