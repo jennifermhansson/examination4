@@ -1,67 +1,88 @@
-import { useState } from 'react'
-import { apiCall } from '../api'
-import type { Customer } from '../types'
+import { useState } from "react";
+import { apiCall } from "../api";
+import type { Customer } from "../types";
 
 interface Props {
-  onLogin: (token: string, user: Customer) => void
+  onLogin: (token: string, user: Customer) => void;
 }
 
 export default function AuthForms({ onLogin }: Props) {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [error, setError] = useState('')
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [error, setError] = useState("");
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError('')
-    const f = new FormData(e.currentTarget)
+    e.preventDefault();
+    setError("");
+    const f = new FormData(e.currentTarget);
     try {
       const data = await apiCall<{ token: string; customer: Customer }>(
-        'POST',
-        '/api/auth/login',
-        { email: f.get('email'), password: f.get('password') },
-      )
-      onLogin(data.token, data.customer)
+        "POST",
+        "/api/auth/login",
+        { email: f.get("email"), password: f.get("password") },
+      );
+      onLogin(data.token, data.customer);
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     }
   }
 
   async function handleRegister(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError('')
-    const f = new FormData(e.currentTarget)
+    e.preventDefault();
+    setError("");
+    const f = new FormData(e.currentTarget);
     try {
       const data = await apiCall<{ token: string; customer: Customer }>(
-        'POST',
-        '/api/auth/register',
+        "POST",
+        "/api/auth/register",
         {
-          username: f.get('username'),
-          email: f.get('email'),
-          password: f.get('password'),
+          username: f.get("username"),
+          email: f.get("email"),
+          password: f.get("password"),
         },
-      )
-      onLogin(data.token, data.customer)
+      );
+      onLogin(data.token, data.customer);
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     }
   }
 
   return (
     <div className="auth-wrap">
       <h2>Välkommen till BurgerHuset</h2>
-      <p>Kund: customer@test.se	customer123
-        Kökspersonal: kitchen@restaurant.se	kitchen123	</p>
-
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+      <div
+        style={{
+          background: "#f5f5f5",
+          border: "1px solid #ddd",
+          borderRadius: "6px",
+          padding: "0.75rem 1rem",
+          marginBottom: "1rem",
+          fontSize: "0.85rem",
+        }}
+      >
+        <strong>Testinloggningar:</strong>
+        <div>
+          👤 Kund: <code>customer@test.se</code> / <code>customer123</code>
+        </div>
+        <div>
+          👨‍🍳 Kök: <code>kitchen@restaurant.se</code> / <code>kitchen123</code>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
         <button
-          className={`btn ${mode === 'login' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => { setMode('login'); setError('') }}
+          className={`btn ${mode === "login" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => {
+            setMode("login");
+            setError("");
+          }}
         >
           Logga in
         </button>
         <button
-          className={`btn ${mode === 'register' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => { setMode('register'); setError('') }}
+          className={`btn ${mode === "register" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => {
+            setMode("register");
+            setError("");
+          }}
         >
           Registrera
         </button>
@@ -69,17 +90,30 @@ export default function AuthForms({ onLogin }: Props) {
 
       {error && <div className="error">{error}</div>}
 
-      {mode === 'login' ? (
+      {mode === "login" ? (
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>E-post</label>
-            <input name="email" type="email" required placeholder="din@epost.se" />
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="din@epost.se"
+            />
           </div>
           <div className="form-group">
             <label>Lösenord</label>
-            <input name="password" type="password" required placeholder="••••••••" />
+            <input
+              name="password"
+              type="password"
+              required
+              placeholder="••••••••"
+            />
           </div>
-          <button type="submit" className="btn btn-primary btn-full">
+          <button
+            type="submit"
+            className="btn btn-primary btn-full"
+          >
             Logga in
           </button>
         </form>
@@ -87,21 +121,39 @@ export default function AuthForms({ onLogin }: Props) {
         <form onSubmit={handleRegister}>
           <div className="form-group">
             <label>Användarnamn</label>
-            <input name="username" type="text" required placeholder="ditt namn" />
+            <input
+              name="username"
+              type="text"
+              required
+              placeholder="ditt namn"
+            />
           </div>
           <div className="form-group">
             <label>E-post</label>
-            <input name="email" type="email" required placeholder="din@epost.se" />
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="din@epost.se"
+            />
           </div>
           <div className="form-group">
             <label>Lösenord</label>
-            <input name="password" type="password" required placeholder="••••••••" />
+            <input
+              name="password"
+              type="password"
+              required
+              placeholder="••••••••"
+            />
           </div>
-          <button type="submit" className="btn btn-primary btn-full">
+          <button
+            type="submit"
+            className="btn btn-primary btn-full"
+          >
             Skapa konto
           </button>
         </form>
       )}
     </div>
-  )
+  );
 }
