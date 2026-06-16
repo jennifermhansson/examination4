@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["bun"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    // Resolve the @exam4/shared workspace package to its live source instead of
+    // bun's install-time copy under node_modules/.bun. Without this the editor
+    // reads a stale snapshot and reports phantom "no exported member" errors
+    // whenever shared/src changes. Paths resolve relative to this file's dir.
+    "paths": {
+      "@exam4/shared/*": ["../shared/*"]
+    }
+  },
+  "include": ["*/src/**/*"]
+}

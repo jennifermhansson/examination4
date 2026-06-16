@@ -48,7 +48,6 @@ await subscribeToEvents(
 app.get("/health", async () => ({ status: "ok", service: "kitchen-service" }));
 
 // List all active (not yet completed) kitchen tickets for the kitchen screen.
-// Authentication was removed, so this endpoint is now open.
 app.get("/kitchen/orders", async (_request, reply) => {
   const orders = await repository.getActiveOrders();
   return reply.send({ orders });

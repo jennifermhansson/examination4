@@ -69,8 +69,11 @@ services:
     environment:
       PORT: 3002
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      RABBITMQ_URL: amqp://rabbitmq:5672
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       seed:
         condition: service_completed_successfully
@@ -84,7 +87,6 @@ services:
       PORT: 3003
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       RABBITMQ_URL: amqp://rabbitmq:5672
-      PRODUCT_SERVICE_URL: http://product-service:3002
     depends_on:
       postgres:
         condition: service_healthy

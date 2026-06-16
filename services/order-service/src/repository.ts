@@ -1,8 +1,7 @@
 import { db } from "./db";
 import type { ResolvedOrderItem } from "./order-logic";
 
-// A customer row. Since authentication was removed there is no password_hash
-// or role anymore — a customer is just a name (username) and an email.
+// A customer row, a customer is just a name (username) and an email.
 export type CustomerRow = {
   id: string;
   username: string;

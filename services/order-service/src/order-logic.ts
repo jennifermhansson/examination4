@@ -13,7 +13,7 @@ export function calculateTotalPrice(items: ResolvedOrderItem[]): number {
 }
 
 // Validate the raw items from the request. Returns an error message string when
-// invalid, or null when the items are OK. (Pure function: easy to unit test.)
+// invalid, or null when the items are OK. 
 export function validateOrderItems(items: CreateOrderItem[]): string | null {
   if (!items.length) {
     return "Order must contain at least one item";

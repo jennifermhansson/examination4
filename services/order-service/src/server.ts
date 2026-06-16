@@ -4,10 +4,12 @@ import {
   ROUTING_KEYS,
   type OrderCreatedEvent,
   type OrderStatusUpdatedEvent,
+  type ProductUpsertedEvent,
+  type ProductDeletedEvent,
 } from "@exam4/shared/src/events";
 import { connectRabbit, publishEvent, subscribeToEvents } from "@exam4/shared/src/rabbitmq";
 import * as repository from "./repository";
-import * as productClient from "./product-client";
+import * as productCache from "./product-cache";
 import {
   calculateTotalPrice,
   resolveOrderItems,
@@ -44,10 +46,49 @@ await subscribeToEvents(
   },
 );
 
+// CONSUMER: keep a local cache of the product catalogue, fed by the
+// product-service. This replaces the old synchronous HTTP lookup: orders are
+// priced from this cache, so order-service no longer depends on product-service
+// being reachable at request time.
+await subscribeToEvents(
+  channel,
+  "order-service.products",
+  [ROUTING_KEYS.PRODUCT_UPSERTED, ROUTING_KEYS.PRODUCT_DELETED],
+  async (event) => {
+    const data = event as ProductUpsertedEvent | ProductDeletedEvent;
+    if (data.type === "product.upserted") {
+      productCache.upsertProduct(data.product);
+    } else if (data.type === "product.deleted") {
+      productCache.deleteProduct(data.productId);
+    }
+  },
+);
+
+// Hydrate the cache: ask the product-service to broadcast its catalogue. We
+// retry until the cache is populated, because on a cold start the
+// product-service may not be subscribed yet when we first ask. Once products
+// arrive the interval stops itself.
+function requestProductSync() {
+  publishEvent(channel, ROUTING_KEYS.PRODUCT_SYNC_REQUESTED, {
+    type: "product.sync.requested",
+  });
+}
+
+requestProductSync();
+let syncAttempts = 0;
+const syncInterval = setInterval(() => {
+  if (productCache.size() > 0 || syncAttempts >= 30) {
+    clearInterval(syncInterval);
+    return;
+  }
+  syncAttempts++;
+  requestProductSync();
+}, 2000);
+
 // Liveness probe used by the gateway / other services.
 app.get("/health", async () => ({ status: "ok", service: "order-service" }));
 
-// Place an order. There is no login anymore: the customer simply provides their
+// Place an order, the customer simply provides their
 // name and email in the order form. We find-or-create the customer by email and
 // then create the order linked to them, all in one request.
 app.post("/orders", async (request, reply) => {
@@ -57,7 +98,7 @@ app.post("/orders", async (request, reply) => {
     items: Array<{ productId: string; quantity: number }>;
   };
 
-  // The customer identity now comes from the form instead of a JWT.
+  // The customer identity comes from the form 
   if (!name || !email) {
     throw new BadRequest("name and email are required");
   }
@@ -68,13 +109,15 @@ app.post("/orders", async (request, reply) => {
     throw new ValidationError(validationError);
   }
 
-  // Look up the real products so prices/names come from the source of truth
-  // (the product-service) rather than trusting the client.
+  // Price the order from the local product cache (fed by product-service over
+  // RabbitMQ) instead of trusting the client. No synchronous call is made here.
   const productIds = items.map((i) => i.productId);
-  const products = await productClient.fetchProductsMap(productIds);
+  const products = productCache.getProducts(productIds);
   const resolvedItems = resolveOrderItems(items, products);
 
   if (!resolvedItems) {
+    // Either an unknown product, or the cache has not been hydrated yet on a
+    // cold start (the sync request above retries until it is populated).
     throw new BadRequest("One or more products not found");
   }
 
@@ -102,7 +145,7 @@ app.post("/orders", async (request, reply) => {
   publishEvent(channel, ROUTING_KEYS.ORDER_CREATED, event);
 
   // Return the customerId so the frontend can store it and later fetch this
-  // customer's orders and notifications (the replacement for a login session).
+  // customer's orders and notifications
   return reply.code(201).send({
     orderId: order.id,
     customerId: order.customer_id,
