@@ -49,6 +49,8 @@ jobs:
               echo "System is up"
               exit 0
             fi
+            echo "Attempt $i failed, waiting..."
+            docker compose ps
             sleep 5
           done
           echo "Stack failed to start"
