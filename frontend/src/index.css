@@ -1,3 +1,32 @@
+/* Tailwind utilities power the redesigned product catalog ("dark island").
+   Preflight is disabled in tailwind.config.js so the existing light-themed
+   views below are left untouched. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Scoped, preflight-like base reset for the catalog only. Tailwind's border /
+   ring utilities and bare <button>/<input> elements assume preflight set
+   `border-width: 0` + `border-style: solid`; since preflight is globally off,
+   we re-create just that behaviour inside `.catalog-root` so the rest of the
+   app is unaffected. */
+@layer base {
+  .catalog-root *,
+  .catalog-root *::before,
+  .catalog-root *::after {
+    border-width: 0;
+    border-style: solid;
+    border-color: #2a2f3a;
+  }
+  .catalog-root button {
+    background-color: transparent;
+    background-image: none;
+  }
+  .catalog-root img {
+    display: block;
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -7,23 +36,26 @@
 }
 
 :root {
-  --bg: #f8fafc;
-  --surface: #ffffff;
+  /* Dark theme shared by every view, matching the catalog "dark island". */
+  --bg: #0f1115;
+  --surface: #181c24;
+  --surface-hover: #1d222c;
 
-  --border: #dbe2ea;
+  --border: #2a2f3a;
 
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
+  --accent: #ff7a00;
+  --accent-hover: #ff8f1f;
 
   --gold: #f59e0b;
 
-  --text: #0f172a;
-  --text-muted: #64748b;
+  --text: #ffffff;
+  --text-muted: #a1a1aa;
 
   --green: #15803d;
   --green-light: #22c55e;
 
-  --radius: 8px;
+  --radius: 10px;
+  --radius-lg: 16px;
 }
 body {
   font-family:
@@ -99,7 +131,7 @@ button {
 
 .btn-primary {
   background: var(--accent);
-  color: white;
+  color: #111;
 }
 .btn-primary:hover {
   background: var(--accent-hover);
@@ -112,7 +144,7 @@ button {
 }
 .btn-outline:hover {
   background: var(--accent);
-  color: white;
+  color: #111;
 }
 
 .btn-kitchen {
@@ -121,24 +153,6 @@ button {
 }
 .btn-kitchen:hover {
   filter: brightness(0.9);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--text-muted);
-  border: none;
-}
-.btn-ghost:hover {
-  color: var(--text);
-}
-
-.btn-green {
-  background: #1b4332;
-  color: var(--green-light);
-  border: 1px solid var(--green);
-}
-.btn-green:hover {
-  background: #2d6a4f;
 }
 
 .btn-sm {
@@ -186,166 +200,11 @@ button {
 
 .tab-badge {
   background: var(--accent);
-  color: white;
+  color: #111;
   border-radius: 10px;
   padding: 1px 6px;
   font-size: 0.7rem;
   font-weight: 700;
-}
-
-/* ---- Auth ---- */
-.auth-wrap {
-  max-width: 380px;
-  margin: 60px auto;
-  background: var(--surface);
-  border-radius: 12px;
-  padding: 32px;
-  border: 1px solid var(--border);
-}
-
-.auth-wrap h2 {
-  margin-bottom: 8px;
-  font-size: 1.2rem;
-}
-.auth-wrap p {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-bottom: 24px;
-}
-
-.auth-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 14px;
-}
-
-.form-group label {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.form-group input {
-  background: #111;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  padding: 9px 12px;
-  color: var(--text);
-  font-size: 0.875rem;
-  width: 100%;
-  transition: border-color 0.15s;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-/* ---- Menu ---- */
-.menu-layout {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 24px;
-  align-items: start;
-}
-
-@media (max-width: 768px) {
-  .menu-layout {
-    grid-template-columns: 1fr;
-  }
-  .cart {
-    position: static;
-  }
-}
-
-.menu-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 14px;
-}
-
-.product-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  transition: border-color 0.15s;
-}
-
-.product-card:hover {
-  border-color: #444;
-}
-
-.product-name {
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-.product-desc {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  flex: 1;
-}
-
-.product-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 8px;
-}
-
-.price {
-  color: var(--gold);
-  font-weight: 700;
-}
-
-/* ---- Cart ---- */
-.cart {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
-  position: sticky;
-  top: 72px;
-}
-
-.cart h3 {
-  font-size: 1rem;
-  margin-bottom: 16px;
-}
-
-.cart-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.875rem;
-}
-
-.cart-item-name {
-  flex: 1;
-}
-.cart-total {
-  text-align: right;
-  font-weight: 700;
-  color: var(--gold);
-  margin-top: 12px;
-}
-.cart-empty {
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  text-align: center;
-  padding: 20px 0;
 }
 
 /* ---- Orders ---- */
@@ -357,8 +216,9 @@ button {
 .order-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 16px 20px;
+  box-shadow: 0 8px 24px -16px rgba(0, 0, 0, 0.7);
 }
 
 .order-head {
@@ -379,8 +239,8 @@ button {
   margin-top: 4px;
 }
 .order-price {
-  color: var(--gold);
-  font-weight: 600;
+  color: var(--accent);
+  font-weight: 700;
   margin-top: 4px;
 }
 
@@ -403,14 +263,15 @@ button {
 
 .notif-card {
   background: var(--surface);
+  border: 1px solid var(--border);
   border-left: 3px solid var(--border);
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
   padding: 12px 16px;
 }
 
 .notif-card.unread {
   border-left-color: var(--accent);
-  background: #eeecec;
+  background: rgba(255, 122, 0, 0.08);
 }
 .notif-msg {
   font-size: 0.9rem;
@@ -435,7 +296,7 @@ button {
 
 .count-badge {
   background: var(--accent);
-  color: white;
+  color: #111;
   border-radius: 20px;
   padding: 2px 12px;
   font-size: 0.8rem;
@@ -457,12 +318,13 @@ button {
 .kitchen-card {
   background: var(--surface);
   border: 2px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 16px;
+  box-shadow: 0 8px 24px -16px rgba(0, 0, 0, 0.7);
 }
 
 .kitchen-card.status-pending {
-  border-color: #444;
+  border-color: var(--border);
 }
 .kitchen-card.status-preparing {
   border-color: var(--gold);
@@ -495,7 +357,7 @@ button {
 }
 
 .kitchen-total {
-  color: var(--gold);
+  color: var(--accent);
   font-weight: 700;
   margin-bottom: 6px;
   font-size: 0.9rem;

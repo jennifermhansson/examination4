@@ -1,26 +1,18 @@
-import type { AppView, Customer } from '../types'
+import type { AppView } from '../types'
 
 interface Props {
   view: AppView
-  customerUser: Customer | null
   onToggleView: () => void
-  onLogout: () => void
 }
 
-export default function Header({ view, customerUser, onToggleView, onLogout }: Props) {
+// Top bar with the logo and a button to switch between the customer and kitchen
+// views. The old "Hej, <user>" greeting and logout button are gone with auth.
+export default function Header({ view, onToggleView }: Props) {
   const isKitchen = view === 'kitchen'
   return (
     <header className="header">
       <span className="logo">🍔 BurgerHuset</span>
       <div className="header-right">
-        {!isKitchen && customerUser && (
-          <>
-            <span className="user-tag">Hej, {customerUser.username}!</span>
-            <button className="btn btn-ghost btn-sm" onClick={onLogout}>
-              Logga ut
-            </button>
-          </>
-        )}
         <button
           className={`btn btn-sm ${isKitchen ? 'btn-kitchen' : 'btn-outline'}`}
           onClick={onToggleView}

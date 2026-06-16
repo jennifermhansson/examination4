@@ -1,0 +1,18 @@
+# Never copy host-installed dependencies into images. Each Docker build runs its
+# own `bun install`, and the host node_modules may contain workspace symlinks
+# (e.g. node_modules/@exam4/shared -> ../../shared) that conflict with the
+# freshly installed directory inside the image.
+node_modules
+**/node_modules
+
+# Lockfiles are per-environment; builds install from package.json.
+**/bun.lock
+
+# Version control, CI and local env — not needed in any image (and .env may hold secrets).
+.git
+.github
+.env
+
+# Editor / OS noise
+.vscode
+.DS_Store

@@ -13,13 +13,18 @@ const UUID_REGEX =
 await app.register(fastifyCors, { origin: true });
 registerErrorHandler(app);
 
+// Liveness probe.
 app.get("/health", async () => ({ status: "ok", service: "product-service" }));
 
+// Return the full product catalogue. This is a public, read-only endpoint
+// (the menu) so it never required authentication.
 app.get("/products", async (_request, reply) => {
   const products = await repository.getProducts();
   return reply.send({ products });
 });
 
+// Return a single product by id. Used by the order-service to look up real
+// prices/names when an order is placed.
 app.get("/products/:id", async (request, reply) => {
   const { id } = request.params as { id: string };
 

@@ -6,7 +6,7 @@ This document is the master implementation plan for the entire project.
 
 Project goal:
 
-Build a distributed fast-food ordering system using:
+Im building a distributed fast-food ordering system using:
 
 - Bun
 - Fastify
@@ -17,7 +17,7 @@ Build a distributed fast-food ordering system using:
 - React
 - TypeScript
 
-The system must satisfy both G and VG requirements.
+The system must satisfy all requirements
 
 ---
 
@@ -174,16 +174,9 @@ Products:
 - Cola
 - Milkshake
 
-Users:
-
-customer@test.se
-
-kitchen@restaurant.se
 
 ## Requirements
 
-- UUID primary keys
-- Foreign keys
 - Seed script
 - Migration script
 
@@ -233,34 +226,6 @@ Verify products can be retrieved.
 Product service works independently.
 
 ---
-
-Goal:
-Create a simple login-based JWT authentication system using seeded users.
-
-Authentication scope:
-
-- No registration
-- No OAuth
-- No Auth0
-- No Supabase Auth
-- No refresh tokens
-- No password reset
-- Only login with seeded users
-
-Seeded users:
-
-- customer@test.se / customer123
-- kitchen@restaurant.se / kitchen123
-
-Endpoint:
-POST /auth/login
-
-JWT payload:
-{
-id,
-email,
-role
-}
 
 # Phase 5 - RabbitMQ Foundation
 
@@ -457,7 +422,6 @@ Create React frontend.
 
 ## Customer Features
 
-- Login
 - View products
 - Add to cart
 - Create order
@@ -467,18 +431,16 @@ Create React frontend.
 
 ## Kitchen Features
 
-- Login
 - View kitchen orders
 - Update order status
 
 ## Requirements
 
-Store JWT in localStorage.
 
 Use only Nginx endpoints.
 
 ## Styling
-- Light, bright colors.
+- Modern
 
 ## Testing
 
@@ -575,11 +537,6 @@ Integration tests
 
 E2E tests
 
-### Demo Users
-
-customer@test.se
-
-kitchen@restaurant.se
 
 ## Stop Condition
 
@@ -587,69 +544,6 @@ Project can be understood and started from README alone.
 
 ---
 
-# VG Requirements
-
-After all G requirements are complete:
-
-## VG Enhancements
-
-### Testing
-
-Test:
-
-- All APIs
-- All event flows
-- All service interactions
-
-### End-to-End Coverage
-
-Test complete flow:
-
-Customer
-
-↓
-
-Order Creation
-
-↓
-
-RabbitMQ
-
-↓
-
-Kitchen
-
-↓
-
-RabbitMQ
-
-↓
-
-Notifications
-
-↓
-
-Customer
-
-### Validation
-
-Improve request validation.
-
-Improve error handling.
-
-Improve edge case handling.
-
-### Optional Enhancements
-
-Only after everything else works:
-
-- Swagger/OpenAPI
-- Redis Cache
-- Advanced order flows
-
-These are optional and must never delay completion of the core system.
-
----
 
 # Final Rule
 

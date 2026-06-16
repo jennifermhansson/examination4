@@ -1,6 +1,7 @@
 {
   "name": "examination4",
   "private": true,
+  "workspaces": ["shared", "services/*"],
   "scripts": {
     "test:unit": "bun test tests/unit",
     "test:integration": "bun test tests/integration",

@@ -1,11 +1,13 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Customers are now created from the order form (just a name + email).
+-- Authentication was removed, so there is no password_hash or role column.
+-- email is UNIQUE so the order-service can "find or create" a customer by email;
+-- username (the name) is NOT unique because two people may share a name.
 CREATE TABLE IF NOT EXISTS customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  username TEXT NOT NULL UNIQUE,
+  username TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'customer',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

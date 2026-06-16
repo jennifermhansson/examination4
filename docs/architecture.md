@@ -13,7 +13,7 @@ over RabbitMQ.
 | Frontend | React + Vite (single SPA, two views) |
 | Gateway | Nginx (serves SPA, reverse-proxies `/api/*`) |
 | Services | Bun runtime + Fastify (TypeScript) |
-| Auth | JWT (`@fastify/jwt`) + bcrypt password hashing |
+| Auth | None — guest checkout (customer identified by name + email) |
 | Database | PostgreSQL (single shared `exam4` db) |
 | Messaging | RabbitMQ — topic exchange `exam4.events` |
 
@@ -22,24 +22,24 @@ over RabbitMQ.
 ```mermaid
 flowchart TB
     subgraph Client["Browser — single React SPA (Vite)"]
-        CV["Customer View<br/>token: bh_customer_token"]
-        KV["Kitchen View<br/>token: bh_kitchen_token"]
+        CV["Customer View<br/>customerId: bh_customer_id"]
+        KV["Kitchen View<br/>(open, no auth)"]
     end
 
     NGINX["Nginx :80<br/>serves SPA + reverse-proxies /api/* (strips /api)"]
 
     Client -->|"GET / — static SPA"| NGINX
-    Client -->|"/api/* — fetch + Bearer JWT"| NGINX
+    Client -->|"/api/* — fetch (no auth)"| NGINX
 
     subgraph Services["Microservices — Bun + Fastify"]
         PROD["product-service :3002"]
-        ORDER["order-service :3003<br/>auth + orders"]
+        ORDER["order-service :3003<br/>orders + customers"]
         KITCHEN["kitchen-service :3004"]
         NOTIF["notification-service :3005"]
     end
 
     NGINX -->|"/api/products"| PROD
-    NGINX -->|"/api/auth, /api/orders"| ORDER
+    NGINX -->|"/api/orders"| ORDER
     NGINX -->|"/api/kitchen"| KITCHEN
     NGINX -->|"/api/notifications"| NOTIF
 
@@ -73,12 +73,14 @@ sequenceDiagram
     participant K as kitchen-service :3004
     participant Nt as notification-service :3005
 
-    U->>N: POST /api/orders (JWT + items)
+    U->>N: POST /api/orders (name + email + items)
     N->>O: POST /orders (prefix stripped)
     O->>P: GET /products/:id (validate + price)
     P->>DB: SELECT product
     DB-->>P: product row
     P-->>O: product data
+    O->>DB: find-or-create customer (by email)
+    DB-->>O: customer id
     O->>DB: INSERT orders + order_items
     DB-->>O: order id
     O->>MQ: publish order.created
@@ -111,7 +113,9 @@ sequenceDiagram
 - **Single shared PostgreSQL.** Every service reads *and* writes (bidirectional arrows).
   This is a deliberate simplification for the exam; a stricter microservice design would
   give each service its own database.
-- **One SPA, two views.** Customer and Kitchen are views in the same React app, each with
-  its own JWT in localStorage (`bh_customer_token`, `bh_kitchen_token`).
+- **One SPA, two views.** Customer and Kitchen are views in the same React app. There is no
+  login: the customer places an order with their name + email, and the backend find-or-creates
+  the customer (by email) and returns a `customerId` that the SPA stores in localStorage
+  (`bh_customer_id`) to fetch that customer's orders and notifications. The Kitchen view is open.
 - **Nginx is the single entry point** on port 80: it serves the built SPA *and* strips the
   `/api` prefix when proxying (e.g. `/api/orders` → `order-service:/orders`).

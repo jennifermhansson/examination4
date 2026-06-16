@@ -1,16 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
-import AuthForms from '../components/AuthForms'
+import MenuCatalog from '../components/catalog/MenuCatalog'
 import StatusBadge from '../components/StatusBadge'
 import { apiCall } from '../api'
 import { formatPrice, formatDate } from '../utils'
-import type { Customer, CustomerTab, Product, CartItem, Order, Notification } from '../types'
+import type { CustomerTab, Product, CartItem, Order, Notification } from '../types'
 
 interface Props {
-  customerToken: string | null
-  onLogin: (token: string, user: Customer) => void
+  // The current customer's id (null until they place their first order).
+  customerId: string | null
+  // Called with the new customer id returned after placing an order.
+  onCustomerId: (id: string) => void
 }
 
-export default function CustomerView({ customerToken, onLogin }: Props) {
+export default function CustomerView({ customerId, onCustomerId }: Props) {
   const [tab, setTab] = useState<CustomerTab>('menu')
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
@@ -18,34 +20,39 @@ export default function CustomerView({ customerToken, onLogin }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [error, setError] = useState('')
 
+  // Load the menu (public endpoint, no customer needed).
   const loadProducts = useCallback(async () => {
     const data = await apiCall<{ products: Product[] }>('GET', '/api/products')
     setProducts(data.products)
   }, [])
 
+  // Load this customer's orders, identified by customerId in the query string.
   const loadOrders = useCallback(async () => {
-    if (!customerToken) return
-    const data = await apiCall<{ orders: Order[] }>('GET', '/api/orders', undefined, customerToken)
+    if (!customerId) return
+    const data = await apiCall<{ orders: Order[] }>(
+      'GET',
+      `/api/orders?customerId=${customerId}`,
+    )
     setOrders(data.orders)
-  }, [customerToken])
+  }, [customerId])
 
+  // Load this customer's notifications, identified by customerId in the query string.
   const loadNotifications = useCallback(async () => {
-    if (!customerToken) return
+    if (!customerId) return
     const data = await apiCall<{ notifications: Notification[] }>(
       'GET',
-      '/api/notifications',
-      undefined,
-      customerToken,
+      `/api/notifications?customerId=${customerId}`,
     )
     setNotifications(data.notifications)
-  }, [customerToken])
+  }, [customerId])
 
   useEffect(() => {
     loadProducts()
   }, [loadProducts])
 
+  // Once we know the customer, poll their orders + notifications every 5 seconds.
   useEffect(() => {
-    if (!customerToken) return
+    if (!customerId) return
     loadOrders()
     loadNotifications()
     const id = setInterval(() => {
@@ -53,7 +60,7 @@ export default function CustomerView({ customerToken, onLogin }: Props) {
       loadNotifications()
     }, 5000)
     return () => clearInterval(id)
-  }, [customerToken, loadOrders, loadNotifications])
+  }, [customerId, loadOrders, loadNotifications])
 
   function addToCart(product: Product) {
     setCart((prev) => {
@@ -71,30 +78,28 @@ export default function CustomerView({ customerToken, onLogin }: Props) {
     setCart((prev) => prev.filter((i) => i.product.id !== productId))
   }
 
-  async function placeOrder() {
-    if (!cart.length || !customerToken) return
+  // Place the order: send the customer's name + email together with the cart.
+  // The backend find-or-creates the customer (by email) and returns its id,
+  // which we store so the customer can then see their orders and notifications.
+  async function placeOrder(name: string, email: string) {
+    if (!cart.length) return
+    if (!name || !email) {
+      setError('Fyll i namn och e-post.')
+      return
+    }
     setError('')
     try {
-      await apiCall(
-        'POST',
-        '/api/orders',
-        { items: cart.map((i) => ({ productId: i.product.id, quantity: i.quantity })) },
-        customerToken,
-      )
+      const data = await apiCall<{ customerId: string }>('POST', '/api/orders', {
+        name,
+        email,
+        items: cart.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
+      })
+      onCustomerId(data.customerId)
       setCart([])
-      await loadOrders()
       setTab('orders')
     } catch (err) {
       setError((err as Error).message)
     }
-  }
-
-  if (!customerToken) {
-    return (
-      <div className="container">
-        <AuthForms onLogin={onLogin} />
-      </div>
-    )
   }
 
   const cartTotal = cart.reduce((s, i) => s + i.product.price * i.quantity, 0)
@@ -127,55 +132,21 @@ export default function CustomerView({ customerToken, onLogin }: Props) {
       {error && <div className="error">{error}</div>}
 
       {tab === 'menu' && (
-        <div className="menu-layout">
-          <div className="menu-grid">
-            {products.map((p) => (
-              <div key={p.id} className="product-card">
-                <div className="product-name">{p.name}</div>
-                <div className="product-desc">{p.description}</div>
-                <div className="product-footer">
-                  <span className="price">{formatPrice(p.price)}</span>
-                  <button className="btn btn-primary btn-sm" onClick={() => addToCart(p)}>
-                    + Lägg till
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="cart">
-            <h3>Din beställning</h3>
-            {cart.length === 0 ? (
-              <p className="cart-empty">Inga varor valda ännu</p>
-            ) : (
-              <>
-                {cart.map((i) => (
-                  <div key={i.product.id} className="cart-item">
-                    <span className="cart-item-name">
-                      {i.product.name} × {i.quantity}
-                    </span>
-                    <span className="price">{formatPrice(i.product.price * i.quantity)}</span>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => removeFromCart(i.product.id)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                <div className="cart-total">Totalt: {formatPrice(cartTotal)}</div>
-                <button className="btn btn-primary btn-full" onClick={placeOrder}>
-                  Beställ nu
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+        <MenuCatalog
+          products={products}
+          cart={cart}
+          cartTotal={cartTotal}
+          onAdd={addToCart}
+          onRemove={removeFromCart}
+          onPlaceOrder={placeOrder}
+        />
       )}
 
       {tab === 'orders' && (
         <div className="orders-list">
-          {orders.length === 0 ? (
+          {!customerId ? (
+            <p className="empty">Lägg en beställning för att se dina beställningar.</p>
+          ) : orders.length === 0 ? (
             <p className="empty">Inga beställningar än. Gå till menyn och beställ!</p>
           ) : (
             orders.map((o) => (
@@ -197,7 +168,9 @@ export default function CustomerView({ customerToken, onLogin }: Props) {
 
       {tab === 'notifications' && (
         <div className="notif-list">
-          {notifications.length === 0 ? (
+          {!customerId ? (
+            <p className="empty">Lägg en beställning för att se dina notiser.</p>
+          ) : notifications.length === 0 ? (
             <p className="empty">Inga notiser ännu.</p>
           ) : (
             notifications.map((n) => (

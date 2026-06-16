@@ -23,7 +23,6 @@ Webbläsare
 Nginx (port 80)
     │
     ├── /api/products      → product-service   (port 3002, internt)
-    ├── /api/auth          → order-service     (port 3003, internt)
     ├── /api/orders        → order-service     (port 3003, internt)
     ├── /api/kitchen       → kitchen-service   (port 3004, internt)
     ├── /api/notifications → notification-service (port 3005, internt)
@@ -49,7 +48,7 @@ Alla tjänster delar PostgreSQL (port 5432, internt)
 | Tjänst | Ansvar |
 |--------|--------|
 | `product-service` | Läser produkter och meny från databasen |
-| `order-service` | Hanterar inloggning (JWT) och ordrar |
+| `order-service` | Skapar kunder (namn + e-post) och hanterar ordrar |
 | `kitchen-service` | Tar emot ordrar via RabbitMQ, hanterar köksvy och statusuppdateringar |
 | `notification-service` | Lyssnar på events och skapar notiser till kunder |
 
@@ -96,12 +95,12 @@ Triggar: orderns status uppdateras i databasen, kunden får en statusnotis.
 
 ## Orderflöde
 
-1. Kund loggar in → `order-service` returnerar JWT
-2. Kund skapar order → `order-service` sparar i PostgreSQL och publicerar `order.created`
-3. `kitchen-service` tar emot eventet → ordern visas i köket med status `pending`
-4. Kök uppdaterar status (`pending` → `preparing` → `ready` → `completed`) → publicerar `order.status.updated`
-5. `order-service` uppdaterar orderstatus i PostgreSQL
-6. `notification-service` skapar en notis till kunden vid varje statusbyte
+1. Kund fyller i namn + e-post och lägger en beställning → `order-service` hittar eller skapar kunden (via e-postadressen), sparar ordern i PostgreSQL och publicerar `order.created`
+2. `kitchen-service` tar emot eventet → ordern visas i köket med status `pending`
+3. Kök uppdaterar status (`pending` → `preparing` → `ready` → `completed`) → publicerar `order.status.updated`
+4. `order-service` uppdaterar orderstatus i PostgreSQL
+5. `notification-service` skapar en notis till kunden vid varje statusbyte
+6. Kunden ser sina ordrar och notiser via sitt `customerId` (sparat i webbläsaren efter första beställningen)
 
 ---
 
@@ -109,29 +108,28 @@ Triggar: orderns status uppdateras i databasen, kunden får en statusnotis.
 
 Bas-URL: **http://localhost**
 
-| Endpoint | Auth | Beskrivning |
-|----------|------|-------------|
-| `GET /api/health` | – | Hälsokontroll (svarar direkt från Nginx) |
-| `GET /api/products` | – | Lista alla produkter |
-| `GET /api/products/:id` | – | Hämta en produkt |
-| `POST /api/auth/login` | – | Logga in, returnerar JWT |
-| `POST /api/orders` | Kund-JWT | Skapa order |
-| `GET /api/orders` | Kund-JWT | Lista egna ordrar |
-| `GET /api/orders/:id` | Kund-JWT | Hämta en specifik order |
-| `GET /api/kitchen/orders` | Köks-JWT | Lista aktiva köksordrar |
-| `PATCH /api/kitchen/orders/:id` | Köks-JWT | Uppdatera orderstatus |
-| `GET /api/notifications` | Kund-JWT | Lista egna notiser |
+Systemet har ingen inloggning. En kund identifieras med `customerId` (returneras när första ordern läggs och skickas med som query-parameter).
+
+| Endpoint | Beskrivning |
+|----------|-------------|
+| `GET /api/health` | Hälsokontroll (svarar direkt från Nginx) |
+| `GET /api/products` | Lista alla produkter |
+| `GET /api/products/:id` | Hämta en produkt |
+| `POST /api/orders` | Skapa order (kropp: `{ name, email, items }`) |
+| `GET /api/orders?customerId=` | Lista en kunds ordrar |
+| `GET /api/orders/:id?customerId=` | Hämta en specifik order (måste tillhöra kunden) |
+| `GET /api/kitchen/orders` | Lista aktiva köksordrar |
+| `PATCH /api/kitchen/orders/:id` | Uppdatera orderstatus |
+| `GET /api/notifications?customerId=` | Lista en kunds notiser |
 
 ---
 
-## Demo-användare
+## Kunder
 
-Skapas automatiskt när systemet startar.
-
-| Användare | Lösenord | Roll |
-|-----------|----------|------|
-| `customer@test.se` | `customer123` | Kund |
-| `kitchen@restaurant.se` | `kitchen123` | Kökspersonal |
+Det finns ingen inloggning och inga fördefinierade användare. Kunden anger namn och
+e-post i orderformuläret; `order-service` hittar en befintlig kund via e-postadressen
+eller skapar en ny. Kundens `customerId` returneras och sparas i webbläsaren så att
+kunden kan se sina ordrar och notiser. Köksvyn är öppen och kräver ingen inloggning.
 
 ---
 
@@ -156,18 +154,18 @@ docker compose up -d --build
 bun run test:integration
 ```
 
-Täcker: korrekta HTTP-statuskoder, felhantering, behörighetskontroll, att data sparas och kan hämtas.
+Täcker: korrekta HTTP-statuskoder, felhantering, att en kund bara ser sina egna ordrar, att data sparas och kan hämtas.
 
 ### End-to-end-tester
 
-Testar hela orderflödet från inloggning till notis, inklusive RabbitMQ-events.
+Testar hela orderflödet från beställning till notis, inklusive RabbitMQ-events.
 
 ```bash
 docker compose up -d --build
 bun run test:e2e
 ```
 
-Täcker: inloggning, orderläggning, köksuppdateringar, notiser, statussynk.
+Täcker: orderläggning (namn + e-post), köksuppdateringar, notiser, statussynk.
 
 ### Kör alla tester
 

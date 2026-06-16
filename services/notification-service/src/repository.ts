@@ -9,6 +9,8 @@ export type NotificationRow = {
   created_at: string;
 };
 
+// Insert a notification for a customer and return the created row. Called from
+// the RabbitMQ consumer whenever an order is created or changes status.
 export async function createNotification(data: {
   customerId: string;
   orderId: string;
@@ -22,6 +24,7 @@ export async function createNotification(data: {
   return notification;
 }
 
+// List all notifications for one customer, newest first (used by GET /notifications).
 export async function getNotificationsByCustomer(
   customerId: string,
 ): Promise<NotificationRow[]> {

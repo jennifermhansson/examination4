@@ -3,6 +3,11 @@ export interface Product {
   name: string
   description?: string
   price: number
+  // Optional presentation fields. The API does not yet return these, so the
+  // catalog enriches each product with curated defaults (see productMeta.ts).
+  imageUrl?: string
+  rating?: number
+  prepTimeMinutes?: number
 }
 
 export interface CartItem {
@@ -41,13 +46,6 @@ export interface Notification {
   message: string
   read: boolean
   created_at: string
-}
-
-export interface Customer {
-  id: string
-  username: string
-  email: string
-  role: string
 }
 
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed'

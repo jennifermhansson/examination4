@@ -5,6 +5,10 @@ if (!databaseUrl) throw new Error("Provide DATABASE_URL env!");
 
 const db = new SQL(databaseUrl);
 
+// Insert the menu products. ON CONFLICT (name) DO NOTHING makes this
+// idempotent, so running the seed repeatedly will not create duplicates.
+// Customers are no longer seeded here: authentication was removed and
+// customers are created on demand from the order form instead.
 async function seedProducts() {
   await db`
     INSERT INTO products (name, description, price)
@@ -19,30 +23,9 @@ async function seedProducts() {
   console.log("Products seeded");
 }
 
-async function seedUsers() {
-  const bcrypt = await import("bcryptjs");
-
-  const customerHash = await bcrypt.hash("customer123", 12);
-  await db`
-    INSERT INTO customers (id, username, email, password_hash, role)
-    VALUES ('00000000-0000-0000-0000-000000000001', 'customer', 'customer@test.se', ${customerHash}, 'customer')
-    ON CONFLICT (email) DO NOTHING
-  `;
-  console.log("Customer user seeded");
-
-  const kitchenHash = await bcrypt.hash("kitchen123", 12);
-  await db`
-    INSERT INTO customers (id, username, email, password_hash, role)
-    VALUES ('00000000-0000-0000-0000-000000000002', 'kitchen', 'kitchen@restaurant.se', ${kitchenHash}, 'kitchen')
-    ON CONFLICT (email) DO NOTHING
-  `;
-  console.log("Kitchen user seeded");
-}
-
 async function runSeed() {
   try {
     await seedProducts();
-    await seedUsers();
     console.log("Seed completed");
     process.exit(0);
   } catch (error) {

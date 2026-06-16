@@ -7,10 +7,13 @@ export type ResolvedOrderItem = {
   unitPrice: number;
 };
 
+// Sum up the order total in minor currency units (e.g. öre): price × quantity.
 export function calculateTotalPrice(items: ResolvedOrderItem[]): number {
   return items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 }
 
+// Validate the raw items from the request. Returns an error message string when
+// invalid, or null when the items are OK. (Pure function: easy to unit test.)
 export function validateOrderItems(items: CreateOrderItem[]): string | null {
   if (!items.length) {
     return "Order must contain at least one item";
@@ -25,6 +28,9 @@ export function validateOrderItems(items: CreateOrderItem[]): string | null {
   return null;
 }
 
+// Combine the requested items with real product data (name + price) fetched
+// from the product-service. Returns null if any product id is unknown, so the
+// caller can reject the whole order.
 export function resolveOrderItems(
   items: CreateOrderItem[],
   products: Map<string, ProductFromService>,

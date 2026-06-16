@@ -1,35 +1,38 @@
-import { beforeAll, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 
 const BASE_URL = process.env.E2E_BASE_URL || "http://localhost";
 
-async function api(path: string, options: RequestInit = {}, token?: string) {
+// Small fetch helper. There is no auth anymore, so there is no token argument:
+// the customer is identified by a customerId query parameter where needed.
+async function api(path: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   const body = await response.json().catch(() => null);
   return { response, body };
 }
 
-let customerToken: string;
-let kitchenToken: string;
+// Convenience: grab the id of the first seeded product.
+async function firstProductId(): Promise<string> {
+  const { body } = await api("/api/products");
+  return body.products[0].id;
+}
 
-beforeAll(async () => {
-  const { body: c } = await api("/api/auth/login", {
+// Convenience: place an order and return the parsed response body
+// ({ orderId, customerId, status, totalPrice }).
+async function placeOrder(
+  name: string,
+  email: string,
+  items: Array<{ productId: string; quantity: number }>,
+) {
+  return api("/api/orders", {
     method: "POST",
-    body: JSON.stringify({ email: "customer@test.se", password: "customer123" }),
+    body: JSON.stringify({ name, email, items }),
   });
-  customerToken = c.token;
+}
 
-  const { body: k } = await api("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email: "kitchen@restaurant.se", password: "kitchen123" }),
-  });
-  kitchenToken = k.token;
-});
-
-// --- Products ---
+// --- Products (unchanged, public endpoints) ---
 
 describe("products", () => {
   test("GET /api/products returns all 5 seeded products", async () => {
@@ -62,103 +65,51 @@ describe("products", () => {
   });
 });
 
-// --- Auth ---
+// --- Orders (name + email instead of login; customerId instead of token) ---
 
-describe("auth", () => {
-  test("POST /api/auth/login with valid customer credentials returns token", async () => {
-    const { response, body } = await api("/api/auth/login", {
+describe("orders", () => {
+  test("POST /api/orders without name/email returns 400", async () => {
+    const productId = await firstProductId();
+    const { response } = await api("/api/orders", {
       method: "POST",
-      body: JSON.stringify({ email: "customer@test.se", password: "customer123" }),
-    });
-    expect(response.status).toBe(200);
-    expect(body.token).toBeDefined();
-    expect(body.customer.role).toBe("customer");
-  });
-
-  test("POST /api/auth/login with valid kitchen credentials returns token", async () => {
-    const { response, body } = await api("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email: "kitchen@restaurant.se", password: "kitchen123" }),
-    });
-    expect(response.status).toBe(200);
-    expect(body.token).toBeDefined();
-    expect(body.customer.role).toBe("kitchen");
-  });
-
-  test("POST /api/auth/login with wrong password returns 401", async () => {
-    const { response } = await api("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email: "customer@test.se", password: "wrong" }),
-    });
-    expect(response.status).toBe(401);
-  });
-
-  test("POST /api/auth/login with missing fields returns 400", async () => {
-    const { response } = await api("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ items: [{ productId, quantity: 1 }] }),
     });
     expect(response.status).toBe(400);
   });
-});
-
-// --- Orders ---
-
-describe("orders", () => {
-  test("GET /api/orders without token returns 401", async () => {
-    const { response } = await api("/api/orders");
-    expect(response.status).toBe(401);
-  });
-
-  test("GET /api/orders with kitchen token returns 403", async () => {
-    const { response } = await api("/api/orders", {}, kitchenToken);
-    expect(response.status).toBe(403);
-  });
 
   test("POST /api/orders with empty items returns 400", async () => {
-    const { response } = await api(
-      "/api/orders",
-      { method: "POST", body: JSON.stringify({ items: [] }) },
-      customerToken,
-    );
+    const { response } = await placeOrder("Empty", "empty@test.se", []);
     expect(response.status).toBe(400);
   });
 
   test("POST /api/orders with zero quantity returns 400", async () => {
-    const { body: list } = await api("/api/products");
-    const productId = list.products[0].id;
-
-    const { response } = await api(
-      "/api/orders",
-      {
-        method: "POST",
-        body: JSON.stringify({ items: [{ productId, quantity: 0 }] }),
-      },
-      customerToken,
-    );
+    const productId = await firstProductId();
+    const { response } = await placeOrder("Zero", "zero@test.se", [
+      { productId, quantity: 0 },
+    ]);
     expect(response.status).toBe(400);
   });
 
-  test("POST /api/orders creates order stored in DB and retrievable", async () => {
-    const { body: list } = await api("/api/products");
-    const productId = list.products[0].id;
+  test("GET /api/orders without customerId returns 400", async () => {
+    const { response } = await api("/api/orders");
+    expect(response.status).toBe(400);
+  });
 
-    const { response: createRes, body: createBody } = await api(
-      "/api/orders",
-      {
-        method: "POST",
-        body: JSON.stringify({ items: [{ productId, quantity: 2 }] }),
-      },
-      customerToken,
+  test("POST /api/orders creates an order retrievable by its customer", async () => {
+    const productId = await firstProductId();
+
+    const { response: createRes, body: createBody } = await placeOrder(
+      "Alice",
+      "alice@test.se",
+      [{ productId, quantity: 2 }],
     );
     expect(createRes.status).toBe(201);
     expect(createBody.orderId).toBeDefined();
+    expect(createBody.customerId).toBeDefined();
     expect(createBody.status).toBe("pending");
 
     const { response: getRes, body: getBody } = await api(
-      `/api/orders/${createBody.orderId}`,
-      {},
-      customerToken,
+      `/api/orders/${createBody.orderId}?customerId=${createBody.customerId}`,
     );
     expect(getRes.status).toBe(200);
     expect(getBody.order.id).toBe(createBody.orderId);
@@ -166,82 +117,82 @@ describe("orders", () => {
   });
 
   test("GET /api/orders/:id with non-uuid returns 400", async () => {
-    const { response } = await api("/api/orders/not-a-uuid", {}, customerToken);
+    const { response } = await api(
+      "/api/orders/not-a-uuid?customerId=00000000-0000-0000-0000-000000000000",
+    );
     expect(response.status).toBe(400);
   });
 
-  test("GET /api/orders/:id for another customer returns 404", async () => {
+  test("a customer cannot fetch another customer's order (404)", async () => {
+    const productId = await firstProductId();
+
+    // Customer A places an order.
+    const { body: a } = await placeOrder("CustomerA", "a@test.se", [
+      { productId, quantity: 1 },
+    ]);
+
+    // Customer B places their own order so we have a valid, different customerId.
+    const { body: b } = await placeOrder("CustomerB", "b@test.se", [
+      { productId, quantity: 1 },
+    ]);
+
+    expect(a.customerId).not.toBe(b.customerId);
+
+    // B tries to read A's order → treated as not found.
     const { response } = await api(
-      "/api/orders/00000000-0000-0000-0000-000000000000",
-      {},
-      customerToken,
+      `/api/orders/${a.orderId}?customerId=${b.customerId}`,
     );
     expect(response.status).toBe(404);
   });
 });
 
-// --- Kitchen ---
+// --- Kitchen (open endpoints, no token) ---
 
 describe("kitchen", () => {
-  test("GET /api/kitchen/orders with customer token returns 403", async () => {
-    const { response } = await api("/api/kitchen/orders", {}, customerToken);
-    expect(response.status).toBe(403);
-  });
-
-  test("GET /api/kitchen/orders without token returns 401", async () => {
-    const { response } = await api("/api/kitchen/orders");
-    expect(response.status).toBe(401);
-  });
-
   test("PATCH /api/kitchen/orders/non-uuid returns 400", async () => {
-    const { response } = await api(
-      "/api/kitchen/orders/not-a-uuid",
-      { method: "PATCH", body: JSON.stringify({ status: "preparing" }) },
-      kitchenToken,
-    );
+    const { response } = await api("/api/kitchen/orders/not-a-uuid", {
+      method: "PATCH",
+      body: JSON.stringify({ status: "preparing" }),
+    });
     expect(response.status).toBe(400);
   });
 
-  test("PATCH /api/kitchen/orders/:id with invalid status returns 400", async () => {
-    const { body: list } = await api("/api/products");
-    const productId = list.products[0].id;
+  test("PATCH /api/kitchen/orders/:id with an invalid transition returns 400", async () => {
+    const productId = await firstProductId();
+    const { body: order } = await placeOrder("Kitchen", "kitchen-it@test.se", [
+      { productId, quantity: 1 },
+    ]);
 
-    const { body: order } = await api(
-      "/api/orders",
-      {
-        method: "POST",
-        body: JSON.stringify({ items: [{ productId, quantity: 1 }] }),
-      },
-      customerToken,
-    );
-
+    // Give the kitchen-service time to consume the order.created event.
     await Bun.sleep(1000);
 
-    const { response } = await api(
-      `/api/kitchen/orders/${order.orderId}`,
-      { method: "PATCH", body: JSON.stringify({ status: "completed" }) },
-      kitchenToken,
-    );
+    // A fresh order is 'pending'; jumping straight to 'completed' is not allowed.
+    const { response } = await api(`/api/kitchen/orders/${order.orderId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "completed" }),
+    });
     expect(response.status).toBe(400);
   });
 });
 
-// --- Notifications ---
+// --- Notifications (customerId instead of token) ---
 
 describe("notifications", () => {
-  test("GET /api/notifications without token returns 401", async () => {
+  test("GET /api/notifications without customerId returns 400", async () => {
     const { response } = await api("/api/notifications");
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(400);
   });
 
-  test("GET /api/notifications with kitchen token returns 403", async () => {
-    const { response } = await api("/api/notifications", {}, kitchenToken);
-    expect(response.status).toBe(403);
-  });
+  test("GET /api/notifications returns a list for a customer", async () => {
+    const productId = await firstProductId();
+    const { body } = await placeOrder("Notify", "notify@test.se", [
+      { productId, quantity: 1 },
+    ]);
 
-  test("GET /api/notifications returns list for customer", async () => {
-    const { response, body } = await api("/api/notifications", {}, customerToken);
+    const { response, body: notifBody } = await api(
+      `/api/notifications?customerId=${body.customerId}`,
+    );
     expect(response.status).toBe(200);
-    expect(Array.isArray(body.notifications)).toBe(true);
+    expect(Array.isArray(notifBody.notifications)).toBe(true);
   });
 });

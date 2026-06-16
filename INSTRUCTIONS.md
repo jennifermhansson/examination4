@@ -68,7 +68,7 @@ Everything is defined in `docker-compose.yml`. Here is every service, what it do
 
 The seed container runs once and then exits. It:
 1. Runs `migrate.ts` — applies the database schema from `db/01-init.sql`
-2. Runs `02-seed.ts` — inserts products and the kitchen staff user
+2. Runs `02-seed.ts` — inserts products 
 
 All four backend services declare `seed: condition: service_completed_successfully`, so they will not start until the seed job finishes.
 

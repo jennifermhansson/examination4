@@ -2,77 +2,40 @@ import { useState, useCallback } from 'react'
 import Header from './components/Header'
 import CustomerView from './views/CustomerView'
 import KitchenView from './views/KitchenView'
-import { apiCall } from './api'
-import type { AppView, Customer } from './types'
+import type { AppView } from './types'
 
-const LS_TOKEN = 'bh_customer_token'
-const LS_USER = 'bh_customer_user'
-const LS_KITCHEN = 'bh_kitchen_token'
+// Persists the customer's id between page reloads. It is set the first time the
+// customer places an order and is used (instead of a login session) to fetch
+// that customer's orders and notifications.
+const LS_CUSTOMER_ID = 'bh_customer_id'
 
 export default function App() {
+  // Which view is shown: the customer ordering UI or the open kitchen UI.
   const [view, setView] = useState<AppView>('customer')
 
-  const [customerToken, setCustomerToken] = useState<string | null>(() =>
-    localStorage.getItem(LS_TOKEN),
-  )
-  const [customerUser, setCustomerUser] = useState<Customer | null>(() => {
-    const raw = localStorage.getItem(LS_USER)
-    return raw ? (JSON.parse(raw) as Customer) : null
-  })
-  const [kitchenToken, setKitchenToken] = useState<string | null>(() =>
-    localStorage.getItem(LS_KITCHEN),
+  const [customerId, setCustomerId] = useState<string | null>(() =>
+    localStorage.getItem(LS_CUSTOMER_ID),
   )
 
-  const handleLogin = useCallback((token: string, user: Customer) => {
-    setCustomerToken(token)
-    setCustomerUser(user)
-    localStorage.setItem(LS_TOKEN, token)
-    localStorage.setItem(LS_USER, JSON.stringify(user))
+  // Called after a successful order: remember the customer's id.
+  const handleCustomerId = useCallback((id: string) => {
+    setCustomerId(id)
+    localStorage.setItem(LS_CUSTOMER_ID, id)
   }, [])
 
-  const handleLogout = useCallback(() => {
-    setCustomerToken(null)
-    setCustomerUser(null)
-    localStorage.removeItem(LS_TOKEN)
-    localStorage.removeItem(LS_USER)
+  // Toggle between the customer and kitchen views. The kitchen view no longer
+  // requires logging in as staff.
+  const toggleView = useCallback(() => {
+    setView((current) => (current === 'customer' ? 'kitchen' : 'customer'))
   }, [])
-
-  const toggleView = useCallback(async () => {
-    const next: AppView = view === 'customer' ? 'kitchen' : 'customer'
-
-    if (next === 'kitchen' && !kitchenToken) {
-      try {
-        const data = await apiCall<{ token: string }>(
-          'POST',
-          '/api/auth/login',
-          { email: 'kitchen@restaurant.se', password: 'kitchen123' },
-        )
-        setKitchenToken(data.token)
-        localStorage.setItem(LS_KITCHEN, data.token)
-      } catch {
-        alert('Kunde inte ansluta som kökspersonal. Är systemet igång?')
-        return
-      }
-    }
-
-    setView(next)
-  }, [view, kitchenToken])
 
   return (
     <>
-      <Header
-        view={view}
-        customerUser={customerUser}
-        onToggleView={toggleView}
-        onLogout={handleLogout}
-      />
+      <Header view={view} onToggleView={toggleView} />
       {view === 'customer' ? (
-        <CustomerView
-          customerToken={customerToken}
-          onLogin={handleLogin}
-        />
+        <CustomerView customerId={customerId} onCustomerId={handleCustomerId} />
       ) : (
-        <KitchenView kitchenToken={kitchenToken!} />
+        <KitchenView />
       )}
     </>
   )

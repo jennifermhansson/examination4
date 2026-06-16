@@ -3,6 +3,8 @@ import type { ProductFromService } from "./types";
 const productServiceUrl =
   process.env.PRODUCT_SERVICE_URL || "http://product-service:3002";
 
+// Fetch a single product from the product-service over HTTP.
+// Returns null for a 404 (unknown product) and throws on other failures.
 export async function fetchProduct(
   productId: string,
 ): Promise<ProductFromService | null> {
@@ -17,6 +19,8 @@ export async function fetchProduct(
   return data.product;
 }
 
+// Fetch several products and return them as a Map keyed by id, so the caller
+// can resolve order items in O(1). Unknown ids are simply left out of the map.
 export async function fetchProductsMap(
   productIds: string[],
 ): Promise<Map<string, ProductFromService>> {
