@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "vitest";
 
 const BASE_URL = process.env.E2E_BASE_URL || "http://localhost";
 

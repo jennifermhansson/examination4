@@ -49,6 +49,8 @@ export default function AuthForms({ onLogin }: Props) {
   return (
     <div className="auth-wrap">
       <h2>Välkommen till BurgerHuset</h2>
+      <p>Kund: customer@test.se	customer123
+        Kökspersonal: kitchen@restaurant.se	kitchen123	</p>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
         <button

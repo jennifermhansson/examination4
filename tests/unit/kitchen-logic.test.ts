@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "vitest";
 import { isValidStatusTransition } from "../../services/kitchen-service/src/kitchen-logic";
 
 describe("kitchen status transitions", () => {
