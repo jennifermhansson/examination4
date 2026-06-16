@@ -28,24 +28,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Create .env
-        # Pass secrets through the env: block (not inline) so values with
-        # special characters are written verbatim. Fail fast with a clear
-        # message if any secret is empty: postgres exits with code 1 when
-        # POSTGRES_PASSWORD is blank, which otherwise surfaces only as the
-        # cryptic "dependency failed to start" error.
-        env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+        # The CI database is an ephemeral container, rebuilt and wiped on every
+        # run (docker compose down -v). It uses fixed, non-sensitive test
+        # credentials instead of repository secrets, so the stack starts
+        # reliably regardless of trigger context (fork PRs, Dependabot, etc.).
+        # Real secrets are only needed for actual deployments.
         run: |
-          if [ -z "$POSTGRES_USER" ] || [ -z "$POSTGRES_PASSWORD" ] || [ -z "$POSTGRES_DB" ]; then
-            echo "::error::A POSTGRES_* secret is empty in this job. If the secrets are defined under a GitHub Environment or as Organization secrets, this job cannot read them without 'environment:' / repo access — move them to Repository secrets or add the environment to the job."
-            exit 1
-          fi
           {
-            echo "POSTGRES_USER=$POSTGRES_USER"
-            echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
-            echo "POSTGRES_DB=$POSTGRES_DB"
+            echo "POSTGRES_USER=postgres"
+            echo "POSTGRES_PASSWORD=postgres"
+            echo "POSTGRES_DB=burgerhuset"
           } >> .env
 
       - name: Use CI nginx config
