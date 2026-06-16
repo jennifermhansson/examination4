@@ -3,8 +3,12 @@ services:
     image: nginx:alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot 
+
     depends_on:
       - frontend
       - product-service
@@ -13,14 +17,17 @@ services:
       - notification-service
     restart: unless-stopped
 
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    # No host port mappings: RabbitMQ is only reachable inside the Docker
-    # network (services connect via amqp://rabbitmq:5672). To inspect the
-    # management UI locally, temporarily uncomment the line below and open
-    # http://localhost:15672 (guest/guest).
-    # ports:
-    #   - "15672:15672"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -29,11 +36,6 @@ services:
 
   postgres:
     image: postgres:16
-    # No host port mapping: PostgreSQL is only reachable inside the Docker
-    # network (services connect via postgres:5432). To inspect the database
-    # from your host with a GUI, temporarily uncomment the lines below.
-    # ports:
-    #   - "5433:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -139,3 +141,5 @@ services:
 
 volumes:
   postgres_data:
+  certbot-certs:
+  certbot-www:
