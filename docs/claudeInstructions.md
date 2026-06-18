@@ -17,7 +17,7 @@ Im building a distributed fast-food ordering system using:
 - React
 - TypeScript
 
-The system must satisfy all requirements
+The system must satisfy all requirements and I help to verify a robust and secure
 
 ---
 

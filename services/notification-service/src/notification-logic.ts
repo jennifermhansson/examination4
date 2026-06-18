@@ -1,6 +1,6 @@
-// Map an order status to the Swedish message shown to the customer. Returns
-// null for unknown statuses so the caller can skip creating a notification.
-// Pure function, so it's easy to unit test.
+// Pure mapping (easy to unit test) from an order status to the Swedish message
+// shown to the customer. Returns null for unknown statuses so the caller can
+// skip creating a notification.
 export function messageForStatus(status: string): string | null {
   switch (status) {
     case "pending":

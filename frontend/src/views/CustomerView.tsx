@@ -5,10 +5,14 @@ import { apiCall } from '../api'
 import { formatPrice, formatDate } from '../utils'
 import type { CustomerTab, Product, CartItem, Order, Notification } from '../types'
 
+// Customer-facing view with three tabs: the menu (browse + cart + place order),
+// the customer's orders, and their notifications. The menu loads from the public
+// products endpoint; once the customer has an id (set after their first order)
+// their orders and notifications are polled every 5 seconds. Placing an order
+// sends name + email + cart; the backend find-or-creates the customer by email
+// and returns the id we store via onCustomerId.
 interface Props {
-  // The current customer's id (null until they place their first order).
   customerId: string | null
-  // Called with the new customer id returned after placing an order.
   onCustomerId: (id: string) => void
 }
 
@@ -20,28 +24,25 @@ export default function CustomerView({ customerId, onCustomerId }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [error, setError] = useState('')
 
-  // Load the menu (public endpoint, no customer needed).
   const loadProducts = useCallback(async () => {
-    const data = await apiCall<{ products: Product[] }>('GET', '/api/products')
+    const data = await apiCall<{ products: Product[] }>('GET', '/products')
     setProducts(data.products)
   }, [])
 
-  // Load this customer's orders, identified by customerId in the query string.
   const loadOrders = useCallback(async () => {
     if (!customerId) return
     const data = await apiCall<{ orders: Order[] }>(
       'GET',
-      `/api/orders?customerId=${customerId}`,
+      `/orders?customerId=${customerId}`,
     )
     setOrders(data.orders)
   }, [customerId])
 
-  // Load this customer's notifications, identified by customerId in the query string.
   const loadNotifications = useCallback(async () => {
     if (!customerId) return
     const data = await apiCall<{ notifications: Notification[] }>(
       'GET',
-      `/api/notifications?customerId=${customerId}`,
+      `/notifications?customerId=${customerId}`,
     )
     setNotifications(data.notifications)
   }, [customerId])
@@ -50,7 +51,6 @@ export default function CustomerView({ customerId, onCustomerId }: Props) {
     loadProducts()
   }, [loadProducts])
 
-  // Once we know the customer, poll their orders + notifications every 5 seconds.
   useEffect(() => {
     if (!customerId) return
     loadOrders()
@@ -78,9 +78,6 @@ export default function CustomerView({ customerId, onCustomerId }: Props) {
     setCart((prev) => prev.filter((i) => i.product.id !== productId))
   }
 
-  // Place the order: send the customer's name + email together with the cart.
-  // The backend find-or-creates the customer (by email) and returns its id,
-  // which we store so the customer can then see their orders and notifications.
   async function placeOrder(name: string, email: string) {
     if (!cart.length) return
     if (!name || !email) {
@@ -89,7 +86,7 @@ export default function CustomerView({ customerId, onCustomerId }: Props) {
     }
     setError('')
     try {
-      const data = await apiCall<{ customerId: string }>('POST', '/api/orders', {
+      const data = await apiCall<{ customerId: string }>('POST', '/orders', {
         name,
         email,
         items: cart.map((i) => ({ productId: i.product.id, quantity: i.quantity })),

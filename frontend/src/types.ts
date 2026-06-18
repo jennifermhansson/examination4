@@ -1,10 +1,11 @@
+// Shared frontend types. The optional presentation fields on Product (imageUrl,
+// rating, prepTimeMinutes) are not returned by the API; the catalog enriches each
+// product with curated defaults (see productMeta.ts).
 export interface Product {
   id: string
   name: string
   description?: string
   price: number
-  // Optional presentation fields. The API does not yet return these, so the
-  // catalog enriches each product with curated defaults (see productMeta.ts).
   imageUrl?: string
   rating?: number
   prepTimeMinutes?: number

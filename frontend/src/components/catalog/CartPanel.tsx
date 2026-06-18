@@ -2,16 +2,16 @@ import { useState } from 'react'
 import { formatPrice } from '../../utils'
 import type { CartItem } from '../../types'
 
+// Sticky order summary for the catalog: lists the cart, shows the total, and
+// carries the name/email form that places the order. onSubmit submits the order
+// with the customer's name + email (the backend find-or-creates the customer).
 interface Props {
   items: CartItem[]
   total: number
   onRemove: (productId: string) => void
-  // Places the order with the customer's name + email (find-or-creates them).
   onSubmit: (name: string, email: string) => void
 }
 
-// Sticky order summary for the catalog. Dark-themed to match the island and
-// carries the name/email form that places the order.
 export default function CartPanel({ items, total, onRemove, onSubmit }: Props) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')

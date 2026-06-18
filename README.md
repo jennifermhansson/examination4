@@ -1,67 +1,71 @@
-# Examination 4 – Snabbmats ordersystem
+# Examination 4 – Fast-food ordering system
 
-Distribuerat, eventdrivet system inspirerat av snabbmatskedjor. Kunden beställer via en React-frontend, ordern flödar genom RabbitMQ till köket, och notiser skickas tillbaka till kunden.
+A distributed, event-driven ordering system inspired by fast-food chains. A customer orders
+through a React frontend; the order flows over RabbitMQ to the kitchen, and status
+notifications flow back to the customer.
 
-## Starta systemet
+## Live deployment
+
+A deployed version runs on my own server at **https://exam4.jenniferh.dev** – the same Docker
+Compose stack behind nginx as a reverse proxy, with HTTPS via a Let's Encrypt certificate
+(managed by certbot).
+
+## Run locally
 
 ```bash
 docker compose up --build
 ```
 
-Öppna sedan `http://localhost` i webbläsaren.
+Then open `http://localhost`. Startup is fully automated: PostgreSQL runs the DDL
+([db/01-init.sql](db/01-init.sql)) and a `seed` service migrates and seeds products before the
+services start.
 
-Det enda port som exponeras externt är **port 80** (Nginx). Alla tjänster kommunicerar internt i Docker-nätverket.
+**Public entry point:** nginx is the only service exposed externally (ports **80** and **443**).
+Every other service runs on the internal Docker network and is not reachable from outside.
 
----
-
-## Arkitektur
+## Architecture
 
 ```
-Webbläsare
-    │
-    ▼
-Nginx (port 80)
-    │
-    ├── /api/products      → product-service   (port 3002, internt)
-    ├── /api/orders        → order-service     (port 3003, internt)
-    ├── /api/kitchen       → kitchen-service   (port 3004, internt)
-    ├── /api/notifications → notification-service (port 3005, internt)
-    └── /                  → frontend          (port 80, internt)
+Browser
+   │
+   ▼
+Nginx (80/443, public)
+   ├── /api/v1/products      → product-service        (3002, internal)
+   ├── /api/v1/orders        → order-service          (3003, internal)
+   ├── /api/v1/kitchen       → kitchen-service        (3004, internal)
+   ├── /api/v1/notifications → notification-service   (3005, internal)
+   └── /                     → frontend               (internal)
 
-order-service ──── RabbitMQ ────► kitchen-service
-                       │
-                       └─────────► notification-service
+order-service ── RabbitMQ ──► kitchen-service ──► notification-service
 
-Alla tjänster delar PostgreSQL (port 5432, internt)
+All services share PostgreSQL (5432, internal).
 ```
 
-- **Frontend** – React-app byggd med Vite, servad av Nginx inuti Docker
-- **Nginx** – enda publika ingång, routar `/api/*` till rätt tjänst
-- **Services** – fyra Fastify-tjänster skrivna i TypeScript, kör på Bun
-- **RabbitMQ** – topic exchange för asynkron kommunikation mellan tjänster
-- **PostgreSQL** – delad relationsdatabas, initieras med DDL och seed vid start
+- **Frontend** – React + Vite, served by nginx inside Docker.
+- **Nginx** – single public entry point; routes the versioned `/api/v1/*` paths to each service.
+- **Services** – four Fastify services in TypeScript, running on Bun.
+- **RabbitMQ** – topic exchange (`exam4.events`) for asynchronous communication.
+- **PostgreSQL** – shared database, initialised with DDL + seed on startup.
 
----
+There are **no synchronous calls between services**: order-service prices orders from a local
+product cache kept in sync via `product.*` events, so placing an order has no runtime dependency
+on another service. See [docs/architecture.md](docs/architecture.md) for the full diagrams.
 
-## Tjänster
+## Services
 
-| Tjänst | Ansvar |
-|--------|--------|
-| `product-service` | Läser produkter och meny från databasen |
-| `order-service` | Skapar kunder (namn + e-post) och hanterar ordrar |
-| `kitchen-service` | Tar emot ordrar via RabbitMQ, hanterar köksvy och statusuppdateringar |
-| `notification-service` | Lyssnar på events och skapar notiser till kunder |
-
----
+| Service | Responsibility |
+|---|---|
+| `product-service` | Serves the product catalogue/menu from the database |
+| `order-service` | Creates customers (name + email) and manages orders |
+| `kitchen-service` | Receives orders via RabbitMQ; kitchen view and status updates |
+| `notification-service` | Listens for events and creates customer notifications |
 
 ## Events
 
-Tjänsterna kommunicerar via en **topic exchange** i RabbitMQ (`exam4.events`).
+Services communicate through the `exam4.events` topic exchange.
 
-### `order.created`
-
-Publiceras av: `order-service`  
-Konsumeras av: `kitchen-service`, `notification-service`
+**`order.created`** — published by `order-service`, consumed by `kitchen-service` and
+`notification-service` (kitchen sees the order; customer is notified it was received).
 
 ```json
 {
@@ -73,105 +77,57 @@ Konsumeras av: `kitchen-service`, `notification-service`
 }
 ```
 
-Triggar: köket ser den nya ordern, kunden får notisen "Din order har mottagits."
-
-### `order.status.updated`
-
-Publiceras av: `kitchen-service`  
-Konsumeras av: `order-service`, `notification-service`
+**`order.status.updated`** — published by `kitchen-service`, consumed by `order-service` (syncs
+the order's status) and `notification-service` (sends a status notification).
 
 ```json
-{
-  "type": "order.status.updated",
-  "orderId": "uuid",
-  "customerId": "uuid",
-  "status": "preparing"
-}
+{ "type": "order.status.updated", "orderId": "uuid", "customerId": "uuid", "status": "preparing" }
 ```
 
-Triggar: orderns status uppdateras i databasen, kunden får en statusnotis.
+Three more events keep order-service's product cache in sync: `product.upserted` and
+`product.deleted` (published by `product-service`) and `product.sync.requested` (published by
+`order-service` on startup to request a full rebroadcast).
 
----
+## Order flow
 
-## Orderflöde
+1. Customer submits name + email + items → `order-service` finds/creates the customer by email,
+   prices the order server-side from its product cache, stores it in PostgreSQL, and publishes
+   `order.created`.
+2. `kitchen-service` consumes the event → the order appears in the kitchen as `pending`.
+3. Kitchen advances the status (`pending` → `preparing` → `ready` → `completed`) → publishes
+   `order.status.updated` on each step (invalid transitions are rejected).
+4. `order-service` syncs the status in PostgreSQL; `notification-service` creates a notification
+   per step.
+5. The customer sees their orders and notifications via their `customerId` (stored in the browser
+   after the first order). There is no login.
 
-1. Kund fyller i namn + e-post och lägger en beställning → `order-service` hittar eller skapar kunden (via e-postadressen), sparar ordern i PostgreSQL och publicerar `order.created`
-2. `kitchen-service` tar emot eventet → ordern visas i köket med status `pending`
-3. Kök uppdaterar status (`pending` → `preparing` → `ready` → `completed`) → publicerar `order.status.updated`
-4. `order-service` uppdaterar orderstatus i PostgreSQL
-5. `notification-service` skapar en notis till kunden vid varje statusbyte
-6. Kunden ser sina ordrar och notiser via sitt `customerId` (sparat i webbläsaren efter första beställningen)
+## API endpoints
 
----
+Base URL: `http://localhost` (or `https://exam4.jenniferh.dev`). A customer is identified by the
+`customerId` returned on their first order.
 
-## API-endpoints
+| Endpoint | Description |
+|---|---|
+| `GET /api/health` | Health check (answered directly by nginx) |
+| `GET /api/v1/products` | List all products |
+| `GET /api/v1/products/:id` | Get one product |
+| `POST /api/v1/orders` | Create an order (body: `{ name, email, items }`) |
+| `GET /api/v1/orders?customerId=` | List a customer's orders |
+| `GET /api/v1/orders/:id?customerId=` | Get one order (must belong to the customer) |
+| `GET /api/v1/kitchen/orders` | List active kitchen orders |
+| `PATCH /api/v1/kitchen/orders/:id` | Update an order's status |
+| `GET /api/v1/notifications?customerId=` | List a customer's notifications |
 
-Bas-URL: **http://localhost**
-
-Systemet har ingen inloggning. En kund identifieras med `customerId` (returneras när första ordern läggs och skickas med som query-parameter).
-
-| Endpoint | Beskrivning |
-|----------|-------------|
-| `GET /api/health` | Hälsokontroll (svarar direkt från Nginx) |
-| `GET /api/products` | Lista alla produkter |
-| `GET /api/products/:id` | Hämta en produkt |
-| `POST /api/orders` | Skapa order (kropp: `{ name, email, items }`) |
-| `GET /api/orders?customerId=` | Lista en kunds ordrar |
-| `GET /api/orders/:id?customerId=` | Hämta en specifik order (måste tillhöra kunden) |
-| `GET /api/kitchen/orders` | Lista aktiva köksordrar |
-| `PATCH /api/kitchen/orders/:id` | Uppdatera orderstatus |
-| `GET /api/notifications?customerId=` | Lista en kunds notiser |
-
----
-
-## Kunder
-
-Det finns ingen inloggning och inga fördefinierade användare. Kunden anger namn och
-e-post i orderformuläret; `order-service` hittar en befintlig kund via e-postadressen
-eller skapar en ny. Kundens `customerId` returneras och sparas i webbläsaren så att
-kunden kan se sina ordrar och notiser. Köksvyn är öppen och kräver ingen inloggning.
-
----
-
-## Tester
-
-### Enhetstester (unit)
-
-Testar ren affärslogik utan beroenden – ingen databas, inget nätverk.
+## Tests
 
 ```bash
-bun run test:unit
+bun run test:unit                          # pure logic + schema contracts (no stack needed)
+docker compose up -d --build               # start the stack for the tests below
+bun run test:integration                   # HTTP contracts + DB via nginx
+bun run test:e2e                           # full flow client → completion (incl. RabbitMQ)
+bun run test                               # all of the above
 ```
 
-Täcker: ordervalidering, prisberäkning, statusövergångar, notismeddelanden.
-
-### Integrationstester
-
-Testar varje tjänsts HTTP-kontrakt och databasinteraktioner mot en igångvarande stack.
-
-```bash
-docker compose up -d --build
-bun run test:integration
-```
-
-Täcker: korrekta HTTP-statuskoder, felhantering, att en kund bara ser sina egna ordrar, att data sparas och kan hämtas.
-
-### End-to-end-tester
-
-Testar hela orderflödet från beställning till notis, inklusive RabbitMQ-events.
-
-```bash
-docker compose up -d --build
-bun run test:e2e
-```
-
-Täcker: orderläggning (namn + e-post), köksuppdateringar, notiser, statussynk.
-
-### Kör alla tester
-
-```bash
-docker compose up -d --build
-bun run test
-```
-
-CI kör enhetstester och hela stack-testerna automatiskt vid varje push via GitHub Actions.
+Tests run automatically on every push via GitHub Actions
+([.github/workflows/ci.yml](.github/workflows/ci.yml)). For the test strategy, definition of
+done, test policy and a note on critical AI usage, see [docs/TESTING.md](docs/TESTING.md).

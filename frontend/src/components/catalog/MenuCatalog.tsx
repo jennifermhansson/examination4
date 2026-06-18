@@ -46,7 +46,6 @@ export default function MenuCatalog({
 
           {products.length === 0 ? (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {/* Skeletons while the menu loads */}
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}

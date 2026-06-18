@@ -1,14 +1,12 @@
+// Full-bleed hero at the top of the catalog, setting the premium tone before the
+// product grid. itemCount is the number of menu items, shown as a live stat.
 interface Props {
-  // Number of items on the menu, shown as a small live stat in the hero.
   itemCount: number
 }
 
-// Full-bleed hero at the top of the catalog. Sets the premium, app-like tone
-// before the product grid.
 export default function Hero({ itemCount }: Props) {
   return (
     <section className="relative overflow-hidden rounded-card border border-line bg-gradient-to-br from-card via-canvas to-canvas px-6 py-12 sm:px-10 sm:py-16">
-      {/* Soft accent glows */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brand/20 blur-3xl"

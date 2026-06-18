@@ -1,3 +1,6 @@
+// Seeds the menu products. ON CONFLICT (name) DO NOTHING makes it idempotent, so
+// re-running the seed never creates duplicates. Customers are not seeded: auth
+// was removed and customers are created on demand from the order form.
 import { SQL } from "bun";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -5,10 +8,6 @@ if (!databaseUrl) throw new Error("Provide DATABASE_URL env!");
 
 const db = new SQL(databaseUrl);
 
-// Insert the menu products. ON CONFLICT (name) DO NOTHING makes this
-// idempotent, so running the seed repeatedly will not create duplicates.
-// Customers are no longer seeded here: authentication was removed and
-// customers are created on demand from the order form instead.
 async function seedProducts() {
   await db`
     INSERT INTO products (name, description, price)

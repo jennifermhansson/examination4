@@ -1,3 +1,7 @@
+// Shared error types. BaseError carries an HTTP status code and a toPublicError()
+// that produces the JSON shape sent to clients ({ success, code, message }); the
+// subclasses are the concrete HTTP errors services throw. registerErrorHandler
+// (error-handler.ts) turns these into responses.
 export abstract class BaseError extends Error {
   abstract statusCode: number;
   full_error: unknown;

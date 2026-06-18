@@ -1,3 +1,6 @@
+// Database access for product-service: getProducts lists the catalogue
+// alphabetically (used to render the menu and to broadcast over RabbitMQ);
+// getProductById fetches one product, or null if it doesn't exist.
 import { db } from "./db";
 
 export type ProductRow = {
@@ -7,7 +10,6 @@ export type ProductRow = {
   price: number;
 };
 
-// List every product, alphabetically by name (used to render the menu).
 export async function getProducts(): Promise<ProductRow[]> {
   return await db<ProductRow[]>`
     SELECT id, name, description, price
@@ -16,7 +18,6 @@ export async function getProducts(): Promise<ProductRow[]> {
   `;
 }
 
-// Fetch one product by id. Returns null if it doesn't exist.
 export async function getProductById(id: string): Promise<ProductRow | null> {
   const [product] = await db<ProductRow[]>`
     SELECT id, name, description, price

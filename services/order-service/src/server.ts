@@ -1,12 +1,25 @@
+// order-service: places orders and serves a customer's orders. Prices every
+// order server-side from a local product cache (productCache) that it keeps up
+// to date from product.upserted/deleted events, so placing an order has no
+// synchronous dependency on product-service; on startup it asks for a catalogue
+// resync until the cache is hydrated. It consumes order.status.updated to keep
+// its own copy of an order's status in sync, and publishes order.created when a
+// customer orders. There is no auth: a customer is identified by the customerId
+// returned on their first order, and an order you don't own is reported as "not
+// found" so other customers' orders aren't leaked. HTTP input is validated with
+// Zod schemas; the shared error handler turns failures into 400s.
 import fastify from "fastify";
 import fastifyCors from "@fastify/cors";
 import {
   ROUTING_KEYS,
+  OrderStatusUpdatedEventSchema,
+  ProductCacheEventSchema,
   type OrderCreatedEvent,
-  type OrderStatusUpdatedEvent,
-  type ProductUpsertedEvent,
-  type ProductDeletedEvent,
 } from "@exam4/shared/src/events";
+import {
+  createOrderSchema,
+  uuidSchema,
+} from "@exam4/shared/src/schemas";
 import { connectRabbit, publishEvent, subscribeToEvents } from "@exam4/shared/src/rabbitmq";
 import * as repository from "./repository";
 import * as productCache from "./product-cache";
@@ -22,40 +35,28 @@ const app = fastify({ logger: true });
 const port = Number(process.env.PORT) || 3003;
 const rabbitUrl = process.env.RABBITMQ_URL || "amqp://rabbitmq:5672";
 
-// Used to reject obviously malformed ids before hitting the database.
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 await app.register(fastifyCors, { origin: true });
 registerErrorHandler(app);
 
-// Connect to RabbitMQ once at startup and reuse the channel for the lifetime
-// of the service (both for consuming and publishing).
 const { channel } = await connectRabbit(rabbitUrl);
 
-// CONSUMER: listen for status changes coming from the kitchen and keep this
-// service's own copy of the order's status in sync.
 await subscribeToEvents(
   channel,
   "order-service.status",
   [ROUTING_KEYS.ORDER_STATUS_UPDATED],
-  async (event) => {
-    const data = event as OrderStatusUpdatedEvent;
+  OrderStatusUpdatedEventSchema,
+  async (data) => {
     await repository.updateOrderStatus(data.orderId, data.status);
     console.log(`Order ${data.orderId} status updated to ${data.status}`);
   },
 );
 
-// CONSUMER: keep a local cache of the product catalogue, fed by the
-// product-service. This replaces the old synchronous HTTP lookup: orders are
-// priced from this cache, so order-service no longer depends on product-service
-// being reachable at request time.
 await subscribeToEvents(
   channel,
   "order-service.products",
   [ROUTING_KEYS.PRODUCT_UPSERTED, ROUTING_KEYS.PRODUCT_DELETED],
-  async (event) => {
-    const data = event as ProductUpsertedEvent | ProductDeletedEvent;
+  ProductCacheEventSchema,
+  async (data) => {
     if (data.type === "product.upserted") {
       productCache.upsertProduct(data.product);
     } else if (data.type === "product.deleted") {
@@ -64,10 +65,6 @@ await subscribeToEvents(
   },
 );
 
-// Hydrate the cache: ask the product-service to broadcast its catalogue. We
-// retry until the cache is populated, because on a cold start the
-// product-service may not be subscribed yet when we first ask. Once products
-// arrive the interval stops itself.
 function requestProductSync() {
   publishEvent(channel, ROUTING_KEYS.PRODUCT_SYNC_REQUESTED, {
     type: "product.sync.requested",
@@ -85,45 +82,26 @@ const syncInterval = setInterval(() => {
   requestProductSync();
 }, 2000);
 
-// Liveness probe used by the gateway / other services.
 app.get("/health", async () => ({ status: "ok", service: "order-service" }));
 
-// Place an order, the customer simply provides their
-// name and email in the order form. We find-or-create the customer by email and
-// then create the order linked to them, all in one request.
 app.post("/orders", async (request, reply) => {
-  const { name, email, items } = request.body as {
-    name: string;
-    email: string;
-    items: Array<{ productId: string; quantity: number }>;
-  };
+  const { name, email, items } = createOrderSchema.parse(request.body);
 
-  // The customer identity comes from the form 
-  if (!name || !email) {
-    throw new BadRequest("name and email are required");
-  }
-
-  // Reject empty carts / non-positive quantities before doing any DB work.
   const validationError = validateOrderItems(items);
   if (validationError) {
     throw new ValidationError(validationError);
   }
 
-  // Price the order from the local product cache (fed by product-service over
-  // RabbitMQ) instead of trusting the client. No synchronous call is made here.
   const productIds = items.map((i) => i.productId);
   const products = productCache.getProducts(productIds);
   const resolvedItems = resolveOrderItems(items, products);
 
   if (!resolvedItems) {
-    // Either an unknown product, or the cache has not been hydrated yet on a
-    // cold start (the sync request above retries until it is populated).
     throw new BadRequest("One or more products not found");
   }
 
   const totalPrice = calculateTotalPrice(resolvedItems);
 
-  // Reuse an existing customer (same email) or create a new one.
   const customer = await repository.findOrCreateCustomer(name, email);
 
   const order = await repository.createOrderWithItems(
@@ -132,8 +110,6 @@ app.post("/orders", async (request, reply) => {
     resolvedItems,
   );
 
-  // PUBLISH: announce the new order so the kitchen can prepare it and the
-  // notification-service can inform the customer.
   const event: OrderCreatedEvent = {
     type: "order.created",
     orderId: order.id,
@@ -144,8 +120,6 @@ app.post("/orders", async (request, reply) => {
 
   publishEvent(channel, ROUTING_KEYS.ORDER_CREATED, event);
 
-  // Return the customerId so the frontend can store it and later fetch this
-  // customer's orders and notifications
   return reply.code(201).send({
     orderId: order.id,
     customerId: order.customer_id,
@@ -154,36 +128,24 @@ app.post("/orders", async (request, reply) => {
   });
 });
 
-// List a customer's orders. The customer is identified by the customerId query
-// param (saved client-side after their first order) instead of a token.
 app.get("/orders", async (request, reply) => {
   const { customerId } = request.query as { customerId?: string };
 
-  if (!customerId || !UUID_REGEX.test(customerId)) {
-    throw new BadRequest("customerId query parameter is required");
-  }
+  uuidSchema.parse(customerId);
 
-  const orders = await repository.getOrdersByCustomer(customerId);
+  const orders = await repository.getOrdersByCustomer(customerId!);
   return reply.send({ orders });
 });
 
-// Fetch a single order, but only if it belongs to the given customerId. This
-// keeps the previous "you can only see your own order" behaviour without auth.
 app.get("/orders/:id", async (request, reply) => {
   const { id } = request.params as { id: string };
   const { customerId } = request.query as { customerId?: string };
 
-  if (!UUID_REGEX.test(id)) {
-    throw new BadRequest("Invalid order id");
-  }
-
-  if (!customerId || !UUID_REGEX.test(customerId)) {
-    throw new BadRequest("customerId query parameter is required");
-  }
+  uuidSchema.parse(id);
+  uuidSchema.parse(customerId);
 
   const order = await repository.getOrderById(id);
 
-  // Treat "not yours" the same as "not found" so we don't leak other orders.
   if (!order || order.customer_id !== customerId) {
     throw new NotFound("Order not found");
   }

@@ -1,4 +1,6 @@
-import { beforeAll, describe, expect, test } from "vitest";
+// Unit tests for the kitchen status-transition guard: the allowed forward steps
+// pass and disallowed jumps (or moves out of a terminal status) are rejected.
+import { describe, expect, test } from "bun:test";
 import { isValidStatusTransition } from "../../services/kitchen-service/src/kitchen-logic";
 
 describe("kitchen status transitions", () => {

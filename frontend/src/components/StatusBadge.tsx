@@ -1,3 +1,5 @@
+// Renders an order status as a coloured Swedish-labelled badge (shared by the
+// customer and kitchen views); unknown statuses fall back to the raw value.
 import type { OrderStatus } from '../types'
 
 const LABELS: Record<OrderStatus, string> = {

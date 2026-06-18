@@ -1,3 +1,6 @@
+// Idempotent migration (CREATE TABLE IF NOT EXISTS) for the tables not created
+// by db/01-init.sql: kitchen_orders and notifications. Runs once at startup via
+// the seed service, before 02-seed.ts.
 import { SQL } from "bun";
 
 const databaseUrl = process.env.DATABASE_URL;

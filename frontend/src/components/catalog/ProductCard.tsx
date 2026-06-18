@@ -18,7 +18,6 @@ export default function ProductCard({ product, onAdd }: Props) {
     <article
       className="group flex flex-col overflow-hidden rounded-card border border-line bg-card shadow-card transition-all duration-300 ease-out hover:-translate-y-1 hover:border-brand/40 hover:bg-card-hover hover:shadow-card-hover focus-within:-translate-y-1 focus-within:border-brand/40"
     >
-      {/* Image (16:9) with hover zoom; falls back to a gradient if it fails. */}
       <div className="relative aspect-[16/9] overflow-hidden">
         {imgFailed ? (
           <div
@@ -37,7 +36,6 @@ export default function ProductCard({ product, onAdd }: Props) {
           />
         )}
 
-        {/* Gradient scrim improves badge legibility over busy photos. */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10"
@@ -67,7 +65,6 @@ export default function ProductCard({ product, onAdd }: Props) {
         </div>
       </div>
 
-      {/* Body */}
       <div className="flex flex-1 flex-col gap-2 p-5">
         <h3 className="text-base font-semibold leading-tight text-ink">
           {product.name}

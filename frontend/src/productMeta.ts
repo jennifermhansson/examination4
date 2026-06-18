@@ -1,9 +1,9 @@
-import type { Product } from './types'
-
 // The API only returns id/name/description/price. To give the catalog its
-// premium look we enrich each product with a curated image, rating and
-// preparation time, matched by (normalised) product name. Anything we don't
-// recognise falls back to a generic food photo so the UI never looks broken.
+// premium look, withMeta enriches each product with a curated image, rating and
+// prep time matched by (normalised) product name, with any value the API already
+// provides taking precedence. Unrecognised products fall back to a generic photo
+// so the UI never looks broken.
+import type { Product } from './types'
 
 interface ProductMeta {
   imageUrl: string
@@ -48,8 +48,6 @@ const FALLBACK: ProductMeta = {
   prepTimeMinutes: 10,
 }
 
-// Returns the product with its presentation fields filled in. Any value the
-// API already provides (e.g. a real imageUrl in future) takes precedence.
 export function withMeta(product: Product): Required<
   Pick<Product, 'imageUrl' | 'rating' | 'prepTimeMinutes'>
 > &

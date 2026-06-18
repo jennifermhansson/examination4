@@ -4,32 +4,30 @@ import { apiCall } from '../api'
 import { formatPrice, formatDate } from '../utils'
 import type { KitchenOrder, OrderStatus } from '../types'
 
-// The next status an order moves to when the kitchen presses the action button.
+// Kitchen screen (no auth): polls the open kitchen endpoints every 5 seconds and
+// lets staff advance each active ticket one step. NEXT_STATUS/NEXT_LABEL map a
+// ticket's current status to the next status and the action button's label.
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   pending: 'preparing',
   preparing: 'ready',
   ready: 'completed',
 }
 
-// The button label for advancing each status.
 const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
   pending: 'Start tillagning',
   preparing: 'Markera klar',
   ready: 'Markera levererad',
 }
 
-// Kitchen screen. Authentication was removed, so this view no longer needs a
-// staff token; it just polls the open kitchen endpoints every 5 seconds.
 export default function KitchenView() {
   const [orders, setOrders] = useState<KitchenOrder[]>([])
   const [error, setError] = useState('')
 
-  // Fetch all active kitchen tickets.
   const load = useCallback(async () => {
     try {
       const data = await apiCall<{ orders: KitchenOrder[] }>(
         'GET',
-        '/api/kitchen/orders',
+        '/kitchen/orders',
       )
       setOrders(data.orders)
     } catch (err) {
@@ -37,17 +35,15 @@ export default function KitchenView() {
     }
   }, [])
 
-  // Poll on mount and then every 5 seconds.
   useEffect(() => {
     load()
     const id = setInterval(load, 5000)
     return () => clearInterval(id)
   }, [load])
 
-  // Advance an order to the given status, then refresh the list.
   async function updateStatus(orderId: string, status: OrderStatus) {
     try {
-      await apiCall('PATCH', `/api/kitchen/orders/${orderId}`, { status })
+      await apiCall('PATCH', `/kitchen/orders/${orderId}`, { status })
       await load()
     } catch (err) {
       setError((err as Error).message)

@@ -1,3 +1,5 @@
+// Unit tests for the status -> Swedish message mapping: known statuses return
+// their message, unknown statuses return null.
 import { describe, expect, test } from "bun:test";
 import { messageForStatus } from "../../services/notification-service/src/notification-logic";
 

@@ -26,24 +26,22 @@ flowchart TB
         KV["Kitchen View<br/>(open, no auth)"]
     end
 
-    NGINX["Nginx :80<br/>serves SPA + reverse-proxies /api/* (strips /api)"]
+    NGINX["Nginx :80<br/>serves SPA + reverse-proxies /api/v1/* (strips /api/v1)"]
 
     Client -->|"GET / — static SPA"| NGINX
-    Client -->|"/api/* — fetch (no auth)"| NGINX
+    Client -->|"/api/v1/* — fetch (no auth)"| NGINX
 
     subgraph Services["Microservices — Bun + Fastify"]
         PROD["product-service :3002"]
-        ORDER["order-service :3003<br/>orders + customers"]
+        ORDER["order-service :3003<br/>orders + customers<br/>prices from local product cache"]
         KITCHEN["kitchen-service :3004"]
         NOTIF["notification-service :3005"]
     end
 
-    NGINX -->|"/api/products"| PROD
-    NGINX -->|"/api/orders"| ORDER
-    NGINX -->|"/api/kitchen"| KITCHEN
-    NGINX -->|"/api/notifications"| NOTIF
-
-    ORDER -->|"HTTP GET /products/:id<br/>validate + price"| PROD
+    NGINX -->|"/api/v1/products"| PROD
+    NGINX -->|"/api/v1/orders"| ORDER
+    NGINX -->|"/api/v1/kitchen"| KITCHEN
+    NGINX -->|"/api/v1/notifications"| NOTIF
 
     DB[("PostgreSQL :5432<br/>customers, products, orders,<br/>order_items, kitchen_orders, notifications")]
     PROD <--> DB
@@ -58,6 +56,11 @@ flowchart TB
     MQ -->|"order.created"| NOTIF
     MQ -->|"order.status.updated"| ORDER
     MQ -->|"order.status.updated"| NOTIF
+
+    PROD -->|"publish product.upserted / product.deleted"| MQ
+    ORDER -->|"publish product.sync.requested (on startup)"| MQ
+    MQ -->|"product.upserted / product.deleted"| ORDER
+    MQ -->|"product.sync.requested"| PROD
 ```
 
 ## Diagram 2 — Request flow: placing an order ("to the DB and back")
@@ -67,18 +70,14 @@ sequenceDiagram
     actor U as Customer (browser)
     participant N as Nginx :80
     participant O as order-service :3003
-    participant P as product-service :3002
     participant DB as PostgreSQL
     participant MQ as RabbitMQ
     participant K as kitchen-service :3004
     participant Nt as notification-service :3005
 
-    U->>N: POST /api/orders (name + email + items)
+    U->>N: POST /api/v1/orders (name + email + items)
     N->>O: POST /orders (prefix stripped)
-    O->>P: GET /products/:id (validate + price)
-    P->>DB: SELECT product
-    DB-->>P: product row
-    P-->>O: product data
+    Note over O: validate + price from local product cache<br/>(hydrated earlier via product.upserted events)
     O->>DB: find-or-create customer (by email)
     DB-->>O: customer id
     O->>DB: INSERT orders + order_items
@@ -101,15 +100,18 @@ sequenceDiagram
   work — they publish to the `exam4.events` topic exchange and interested services react.
   This keeps them loosely coupled: kitchen and notification can fail/restart independently
   without breaking order creation.
-- **Two event types** drive the system:
+- **Two event types** drive the customer flow:
   - `order.created` — published by **order-service**; consumed by **kitchen-service**
     (creates the kitchen ticket) and **notification-service** (notifies the customer).
   - `order.status.updated` — published by **kitchen-service** when staff advance an order
     (pending → preparing → ready → completed); consumed by **order-service** (syncs the
     `orders.status`) and **notification-service** (notifies the customer).
-- **One synchronous service-to-service call:** order-service calls product-service over
-  HTTP to validate products and read authoritative prices before writing the order — the
-  client's prices are never trusted.
+- **No synchronous service-to-service calls.** order-service prices orders from a local
+  in-memory product cache instead of calling product-service over HTTP, so placing an order
+  has no runtime dependency on another service. The cache is kept in sync by three more
+  events: product-service publishes `product.upserted` / `product.deleted`, and order-service
+  publishes `product.sync.requested` on startup to ask for a full rebroadcast. The client's
+  prices are still never trusted — pricing is resolved server-side from the cache.
 - **Single shared PostgreSQL.** Every service reads *and* writes (bidirectional arrows).
   This is a deliberate simplification for the exam; a stricter microservice design would
   give each service its own database.
@@ -118,4 +120,4 @@ sequenceDiagram
   the customer (by email) and returns a `customerId` that the SPA stores in localStorage
   (`bh_customer_id`) to fetch that customer's orders and notifications. The Kitchen view is open.
 - **Nginx is the single entry point** on port 80: it serves the built SPA *and* strips the
-  `/api` prefix when proxying (e.g. `/api/orders` → `order-service:/orders`).
+  `/api/v1` prefix when proxying (e.g. `/api/v1/orders` → `order-service:/orders`).

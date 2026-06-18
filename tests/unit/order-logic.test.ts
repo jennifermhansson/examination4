@@ -1,3 +1,5 @@
+// Unit tests for order-service's pure order helpers: item validation, total
+// pricing, and resolving requested items against known products.
 import { describe, expect, test } from "bun:test";
 import {
   calculateTotalPrice,

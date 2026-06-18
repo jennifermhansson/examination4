@@ -1,13 +1,13 @@
-// The allowed order-status flow. An order can only move forward one step at a
-// time: pending → preparing → ready → completed.
+// The allowed order-status flow as a pure, unit-testable guard. An order may
+// only move forward one step at a time (pending -> preparing -> ready ->
+// completed); isValidStatusTransition returns true only for those steps and is
+// used to guard the kitchen PATCH endpoint.
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   pending: ["preparing"],
   preparing: ["ready"],
   ready: ["completed"],
 };
 
-// Returns true only if moving from `current` to `next` is one of the allowed
-// transitions above. Pure function, used to guard the PATCH endpoint.
 export function isValidStatusTransition(
   current: string,
   next: string,
