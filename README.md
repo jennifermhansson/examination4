@@ -18,10 +18,19 @@ docker compose up --build
 
 Then open `http://localhost`. Startup is fully automated: PostgreSQL runs the DDL
 ([db/01-init.sql](db/01-init.sql)) and a `seed` service migrates and seeds products before the
-services start.
+services start. No configuration is required — the compose file falls back to local defaults, so
+the stack boots out of the box. To override the database credentials, `cp .env.example .env` and
+edit it first.
 
-**Public entry point:** nginx is the only service exposed externally (ports **80** and **443**).
+**Public entry point:** nginx is the only service exposed externally (port **80** locally).
 Every other service runs on the internal Docker network and is not reachable from outside.
+
+The deployed server adds HTTPS on **443** via the production overlay
+([docker-compose.prod.yml](docker-compose.prod.yml), TLS config + certbot):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
 
 ## Architecture
 

@@ -2,9 +2,11 @@
 // request input at the top of the handler, so invalid input is rejected at the
 // boundary (turned into a 400 by the shared error handler) before any business
 // logic or DB call runs. uuidSchema replaces the old per-service UUID regex.
-// createOrderSchema validates the request *shape* only; domain rules like
-// "at least one item" / "quantity > 0" stay in order-logic, and the allowed
-// status *transitions* stay in kitchen-logic.
+// createOrderSchema validates the request *shape*: each quantity must be a
+// positive integer (so fractional or non-positive quantities are rejected at the
+// boundary as a 400). Higher-level domain rules like "at least one item" stay in
+// order-logic (which also re-checks quantity > 0 as a pure, independently tested
+// rule), and the allowed status *transitions* stay in kitchen-logic.
 import { z } from "zod";
 
 export const uuidSchema = z.uuid();
@@ -15,7 +17,7 @@ export const createOrderSchema = z.object({
   items: z.array(
     z.object({
       productId: z.string(),
-      quantity: z.number(),
+      quantity: z.number().int().positive(),
     }),
   ),
 });

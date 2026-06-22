@@ -18,6 +18,5 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Local-only Docker Compose override (forces nginx to HTTP-only for local runs).
-# Must not reach the production server, where the TLS nginx.conf is used.
+# Optional local-only Docker Compose override (auto-loaded by `docker compose up`).
 docker-compose.override.yml

@@ -1,0 +1,25 @@
+# Production overlay (server only). Adds HTTPS on 443 with the TLS nginx config
+# and Let's Encrypt certs (managed by certbot). The local/CI default stack uses
+# only docker-compose.yml (HTTP on port 80), so a fresh checkout boots without
+# any certificates.
+#
+# Run on the server with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+services:
+  nginx:
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - certbot-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+
+volumes:
+  certbot-certs:
+  certbot-www:

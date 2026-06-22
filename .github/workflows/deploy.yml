@@ -12,10 +12,10 @@ jobs:
       - name: Deploy till server
         uses: appleboy/ssh-action@v1
         with:
-          host: 217.160.56.248
-          username: jen
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/examination4
             git pull
-            docker compose up -d --build
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build

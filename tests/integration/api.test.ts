@@ -124,6 +124,14 @@ describe("orders", () => {
     expect(response.status).toBe(400);
   });
 
+  test("POST /api/v1/orders with a fractional quantity returns 400", async () => {
+    const productId = await firstProductId();
+    const { response } = await placeOrder("Fraction", "fraction@test.se", [
+      { productId, quantity: 1.5 },
+    ]);
+    expect(response.status).toBe(400);
+  });
+
   test("POST /api/v1/orders with a malformed body (no items) returns 400", async () => {
     const { response } = await api("/api/v1/orders", {
       method: "POST",

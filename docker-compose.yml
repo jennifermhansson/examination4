@@ -3,12 +3,8 @@ services:
     image: nginx:alpine
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - certbot-certs:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
-
     depends_on:
       - frontend
       - product-service
@@ -16,12 +12,6 @@ services:
       - kitchen-service
       - notification-service
     restart: unless-stopped
-
-  certbot:
-    image: certbot/certbot
-    volumes:
-      - certbot-certs:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -34,14 +24,14 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-burgerhuset}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-burgerhuset}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -52,7 +42,7 @@ services:
     volumes:
       - ./db:/app
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-burgerhuset}
     command: sh -c "bun run migrate.ts && bun run 02-seed.ts"
     depends_on:
       postgres:
@@ -65,7 +55,7 @@ services:
       dockerfile: services/product-service/Dockerfile
     environment:
       PORT: 3002
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-burgerhuset}
       RABBITMQ_URL: amqp://rabbitmq:5672
     depends_on:
       postgres:
@@ -82,7 +72,7 @@ services:
       dockerfile: services/order-service/Dockerfile
     environment:
       PORT: 3003
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-burgerhuset}
       RABBITMQ_URL: amqp://rabbitmq:5672
     depends_on:
       postgres:
@@ -101,7 +91,7 @@ services:
       dockerfile: services/kitchen-service/Dockerfile
     environment:
       PORT: 3004
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-burgerhuset}
       RABBITMQ_URL: amqp://rabbitmq:5672
     depends_on:
       postgres:
@@ -118,7 +108,7 @@ services:
       dockerfile: services/notification-service/Dockerfile
     environment:
       PORT: 3005
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-burgerhuset}
       RABBITMQ_URL: amqp://rabbitmq:5672
     depends_on:
       postgres:
@@ -137,5 +127,3 @@ services:
 
 volumes:
   postgres_data:
-  certbot-certs:
-  certbot-www:

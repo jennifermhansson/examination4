@@ -29,6 +29,15 @@ Event-driven communication is tested in two parts to keep fast and slow tests se
 - **Propagation** (e2e): the full flow in [tests/e2e/order-flow.test.ts](../tests/e2e/order-flow.test.ts)
   proves that events are actually published and consumed over RabbitMQ
   (`order.created` → kitchen, `order.status.updated` → order-service + notification).
+  [tests/e2e/product-cache-sync.test.ts](../tests/e2e/product-cache-sync.test.ts) covers the
+  cache-sync events: an order containing the whole seeded catalogue is priced correctly
+  server-side, which can only happen if every `product.upserted` (broadcast on startup and on
+  `product.sync.requested`) has propagated into order-service's cache over RabbitMQ.
+
+**Known limitation:** `product.deleted` is covered at the contract level only. product-service
+is read-only over HTTP, so there is no public way to remove a product and observe the cache
+drop it end-to-end. A write/admin endpoint for the catalogue would close this gap; it was left
+out as out of scope for the ordering flow.
 
 ## Contracts, versioning and robustness
 
